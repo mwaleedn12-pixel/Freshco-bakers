@@ -1,0 +1,23 @@
+# --- Backend (Python/FastAPI) ---
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+backend/venv/
+backend/.venv/
+*.pyc
+
+# --- Frontend (Flutter) ---
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/pubspec.lock
+
+# --- General ---
+.DS_Store
+*.log
+.idea/
+.vscode/
