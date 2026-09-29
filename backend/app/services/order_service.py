@@ -28,7 +28,8 @@ from app.models.order import (
 )
 from app.models.setting import Setting
 from app.models.user import User
-from app.services import cart_service
+from app.services import cart_service, inventory_service
+from app.services.notification_service import notify, notify_staff
 from app.services.errors import ServiceError
 from app.services.pricing import effective_price, q2
 
@@ -61,7 +62,7 @@ def _load_order(db: Session, order_id: int) -> Order | None:
     )
 
 
-def _apply_coupon(db: Session, code: str, user: User, subtotal: Decimal) -> tuple[Coupon, Decimal]:
+def apply_coupon(db: Session, code: str, user: User, subtotal: Decimal) -> tuple[Coupon, Decimal]:
     coupon = db.query(Coupon).filter(func.upper(Coupon.code) == code.strip().upper()).first()
     if coupon is None or coupon.status != "active":
         raise ServiceError("Invalid or inactive coupon code", 400)
@@ -145,7 +146,7 @@ def checkout(db: Session, user: User, req) -> Order:
     # --- totals
     discount, coupon = Decimal("0"), None
     if req.coupon_code:
-        coupon, discount = _apply_coupon(db, req.coupon_code, user, subtotal)
+        coupon, discount = apply_coupon(db, req.coupon_code, user, subtotal)
     taxable = subtotal - discount
     tax = q2(taxable * _setting_number(db, "tax.rate_percent", "percent") / 100)
     delivery_fee = q2(_setting_number(db, "delivery.fee_flat", "amount")) if req.order_type == OrderType.DELIVERY else Decimal("0.00")
@@ -179,6 +180,9 @@ def checkout(db: Session, user: User, req) -> Order:
                               note="Order placed"))
     if coupon is not None:
         db.add(CouponUsage(coupon_id=coupon.id, order_id=order.id, customer_id=user.id))
+
+    notify(db, user.id, "Order received", f"Your order {order.order_number} has been placed. Total: {total}.", "order")
+    notify_staff(db, "New order", f"{order.order_number} - {user.name} - total {total}", "order")
 
     cart.items.clear()
     db.commit()
@@ -215,23 +219,13 @@ def cancel_order(db: Session, user: User, order_id: int) -> Order:
     if order.status not in CANCELLABLE:
         raise ServiceError("This order can no longer be cancelled", 400)
 
-    if order.branch_id is not None:
-        for item in order.items:
-            if item.product_id is None:
-                continue
-            inventory = (
-                db.query(Inventory)
-                .filter(Inventory.product_id == item.product_id, Inventory.branch_id == order.branch_id)
-                .with_for_update()
-                .first()
-            )
-            if inventory is not None:
-                inventory.reserved_quantity = max(0, inventory.reserved_quantity - item.quantity)
+    inventory_service.release_reservation(db, order)
 
     order.status = OrderStatus.CANCELLED
     db.add(OrderStatusHistory(order_id=order.id, status=OrderStatus.CANCELLED, changed_by=user.id,
                               note="Cancelled by customer"))
     db.query(CouponUsage).filter(CouponUsage.order_id == order.id).delete()
+    notify_staff(db, "Order cancelled", f"{order.order_number} was cancelled by the customer", "order")
     db.commit()
     db.expire_all()
     return _load_order(db, order.id)

@@ -78,3 +78,35 @@ class OrderPage(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ------------------------------------------------------------------ staff views
+from app.schemas.address import AddressOut  # noqa: E402
+
+
+class StatusChange(BaseModel):
+    status: OrderStatus
+    note: str | None = Field(default=None, max_length=300)
+
+
+class PaymentUpdate(BaseModel):
+    status: Literal["PAID", "FAILED", "REFUNDED"]
+    transaction_reference: str | None = Field(default=None, max_length=150)
+
+
+class OrderAdminOut(OrderOut):
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: str | None = None
+
+
+class OrderAdminDetailOut(OrderAdminOut):
+    status_history: list[StatusHistoryOut] = []
+    address: AddressOut | None = None
+
+
+class OrderAdminPage(BaseModel):
+    items: list[OrderAdminOut]
+    total: int
+    page: int
+    limit: int

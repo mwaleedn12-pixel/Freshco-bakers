@@ -5,7 +5,7 @@ Callers add the log inside their own transaction and commit once.
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -21,7 +21,7 @@ def snapshot(obj: Any) -> dict:
         value = getattr(obj, col.key)
         if isinstance(value, Decimal):
             value = float(value)
-        elif isinstance(value, (datetime, date)):
+        elif isinstance(value, (datetime, date, time)):
             value = value.isoformat()
         elif isinstance(value, enum.Enum):
             value = value.value
