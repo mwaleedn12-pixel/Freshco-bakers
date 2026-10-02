@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import (
+    ChangePasswordRequest, LoginRequest, ProfileUpdate, RegisterRequest, TokenResponse, UserOut,
+)
 from app.services import auth_service
 
 router = APIRouter()
@@ -47,3 +49,29 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)) -> UserOut:
     return _to_user_out(current_user)
+
+
+@router.put("/profile", response_model=UserOut)
+def update_profile(
+    payload: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    updated = auth_service.update_user_profile(db, current_user, name=payload.name, phone=payload.phone)
+    return _to_user_out(updated)
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    try:
+        auth_service.change_user_password(
+            db, current_user, old_password=payload.old_password, new_password=payload.new_password
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return {"message": "Password changed successfully"}
+

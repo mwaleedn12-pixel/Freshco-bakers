@@ -51,3 +51,20 @@ def authenticate_user(db: Session, *, email: str, password: str) -> User | None:
 def issue_token(user: User) -> str:
     role_name = user.role.name if user.role else None
     return create_access_token(subject=str(user.id), extra_claims={"role": role_name, "email": user.email})
+
+
+def update_user_profile(db: Session, user: User, name: str, phone: str | None = None) -> User:
+    user.name = name
+    if phone is not None:
+        user.phone = phone
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def change_user_password(db: Session, user: User, old_password: str, new_password: str) -> None:
+    if not verify_password(old_password, user.password_hash):
+        raise ValueError("Incorrect existing password")
+    user.password_hash = hash_password(new_password)
+    db.commit()
+

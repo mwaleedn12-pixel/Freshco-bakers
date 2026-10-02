@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    addresses, auth, branches, cart, categories, coupons, custom_cakes, health, inventory, notifications,
-    orders, products, reviews,
+    addresses, analytics, audit_logs, auth, branches, cart, categories, coupons, custom_cakes, customers,
+    expenses, health, inventory, notifications, orders, payments, pos, products, reviews, settings, staff,
 )
 
 api_router = APIRouter()
@@ -20,8 +20,12 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(coupons.router, prefix="/coupons", tags=["coupons"])
 api_router.include_router(custom_cakes.router, prefix="/custom-cakes", tags=["custom cakes"])
 api_router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
+api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
+api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
+api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(pos.router, prefix="/pos", tags=["pos"])
+api_router.include_router(expenses.router, prefix="/expenses", tags=["expenses"])
+api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit logs"])
 
-# Future modules will be wired in here, e.g.:
-# api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
-# api_router.include_router(pos.router, prefix="/pos", tags=["pos"])
-# api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
