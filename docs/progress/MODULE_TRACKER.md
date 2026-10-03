@@ -35,11 +35,16 @@ Modules 9-13: staff & customer management, settings, payments & thermal receipts
 
 | # | Module | Scope (from the SRS) |
 |---|--------|----------------------|
-| 14 | **Flutter customer app & web** | Auth, 3D interactive home screen, catalog + search, cart, checkout, orders tracking, custom cake request form, reviews, profile |
-| 15 | **Flutter admin dashboard** | Executive dashboard, product management, order kanban board, inventory management, custom cake quotes, coupons, reviews moderation, staff, reports, settings |
-| 16 | **Flutter POS** | Search / barcode scan, fast counter billing, payment popup, thermal print receipt preview (58mm/80mm), POS returns, daily closing |
-| 17 | **Security hardening & deployment** | Rate limiting, CORS/HTTPS, Alembic migrations, Docker setup, CI/CD pipeline |
-| 18 | **Optional (Phase 7)** | Offline POS queue/sync, loyalty points, recommendations, WhatsApp / push notifications, marketing automation |
+| 14 | Flutter / Web Customer App | 📦 | Auth, 3D interactive home screen, catalog + search, cart, checkout, orders tracking, custom cake request form, reviews | `module-14-to-16-frontend.md` |
+| 15 | Flutter / Web Admin Dashboard | 📦 | Executive dashboard, product management, order kanban board, inventory management, custom cake quotes, coupons, reviews moderation, staff, reports, settings | `module-14-to-16-frontend.md` |
+| 16 | Flutter / Web POS Counter Billing | 📦 | Search / barcode scan, fast counter billing, payment popup, thermal print receipt preview (58mm/80mm), POS returns, daily closing | `module-14-to-16-frontend.md` |
+| 17 | Security hardening & deployment | 📦 | Rate limiting, CORS/HTTPS, Alembic migrations, Docker setup, CI/CD pipeline | `module-17-deployment.md` |
+
+**Commit message for the Frontend & Presentation App push**
+```
+Modules 14-16: Customer web app, Admin dashboard, and POS Counter Billing web presentation application
+```
+
 
 ---
 

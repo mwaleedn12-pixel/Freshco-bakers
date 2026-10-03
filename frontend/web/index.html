@@ -1,46 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="freshco_bakers">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>freshco_bakers</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freshco Bakers — Digital Management Platform</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- Presentation Role Switcher Bar -->
+  <div class="presentation-bar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <i class="fa-solid fa-graduation-cap" style="color:var(--accent);"></i>
+      <strong>Freshco Bakers — Web Tech Presentation Platform</strong>
+    </div>
+    <div class="role-switcher">
+      <button class="role-btn active" id="btn-role-customer" onclick="switchRole('customer')"><i class="fa-solid fa-store"></i> Customer Portal</button>
+      <button class="role-btn" id="btn-role-admin" onclick="switchRole('admin')"><i class="fa-solid fa-chart-line"></i> Admin Dashboard</button>
+      <button class="role-btn" id="btn-role-pos" onclick="switchRole('pos')"><i class="fa-solid fa-cash-register"></i> POS Counter Billing</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="#" class="brand-logo" onclick="switchTab('home')">
+        <div class="brand-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+        <span>Freshco Bakers</span>
+      </a>
+
+      <!-- Nav Links for Customer View -->
+      <nav id="customer-nav">
+        <ul class="nav-links">
+          <li><a class="nav-link active" onclick="switchTab('home')" id="nav-home">Home</a></li>
+          <li><a class="nav-link" onclick="switchTab('catalog')" id="nav-catalog">Catalog</a></li>
+          <li><a class="nav-link" onclick="switchTab('cake')" id="nav-cake">Custom Cakes</a></li>
+          <li><a class="nav-link" onclick="switchTab('orders')" id="nav-orders">Track Orders</a></li>
+          <li><a class="nav-link" onclick="switchTab('reviews')" id="nav-reviews">Reviews</a></li>
+        </ul>
+      </nav>
+
+      <!-- Nav Links for Admin View -->
+      <nav id="admin-nav" style="display:none;">
+        <ul class="nav-links">
+          <li><a class="nav-link active" onclick="switchAdminTab('overview')" id="admin-nav-overview">Overview</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('products')" id="admin-nav-products">Products</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('orders-kanban')" id="admin-nav-orders">Orders Board</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('inventory')" id="admin-nav-inventory">Inventory</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('cakes')" id="admin-nav-cakes">Cake Quotes</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('staff')" id="admin-nav-staff">Staff</a></li>
+          <li><a class="nav-link" onclick="switchAdminTab('settings')" id="admin-nav-settings">Settings</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <div class="icon-btn" id="cart-btn" onclick="toggleCartDrawer()">
+          <i class="fa-solid fa-basket-shopping"></i>
+          <span class="badge" id="cart-count">0</span>
+        </div>
+        <button class="btn-primary" id="user-btn" onclick="openAuthModal()">
+          <i class="fa-regular fa-user"></i> <span id="user-btn-text">Sign In</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="main-container" id="main-content">
+    <!-- Dynamic Content Rendered Here via app.js -->
+  </main>
+
+  <!-- Auth Modal -->
+  <div class="modal-overlay" id="auth-modal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2 id="auth-modal-title">Sign In to Freshco</h2>
+        <button class="btn-secondary" onclick="closeAuthModal()" style="padding:4px 10px;">✕</button>
+      </div>
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group" id="group-name" style="display:none;">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="auth-name" class="form-control" placeholder="e.g. John Doe">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="auth-email" class="form-control" required placeholder="name@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="auth-password" class="form-control" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center;" id="auth-submit-btn">Sign In</button>
+      </form>
+      <div style="margin-top:16px; text-align:center; font-size:14px;">
+        <span id="auth-toggle-text">Don't have an account?</span>
+        <a href="#" onclick="toggleAuthMode()" style="color:var(--primary); font-weight:700; text-decoration:none;" id="auth-toggle-link">Register Now</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thermal Receipt Modal -->
+  <div class="modal-overlay" id="receipt-modal">
+    <div class="modal-card" style="width:380px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3>Thermal Receipt</h3>
+        <button class="btn-secondary" onclick="closeReceiptModal()" style="padding:4px 10px;">✕</button>
+      </div>
+      <div id="thermal-receipt-content" class="thermal-receipt"></div>
+      <button class="btn-primary" onclick="window.print()" style="width:100%; margin-top:16px; justify-content:center;">
+        <i class="fa-solid fa-print"></i> Print Receipt (58/80mm)
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
