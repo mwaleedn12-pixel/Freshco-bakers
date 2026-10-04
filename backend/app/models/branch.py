@@ -3,11 +3,17 @@ Branches (multi-branch support, section 10/17) and customer/delivery Addresses.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, ForeignKey, Numeric, String, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 
 class Branch(Base, IDMixin, TimestampMixin):

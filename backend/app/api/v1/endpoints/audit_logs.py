@@ -23,14 +23,15 @@ def list_audit_logs(
     logs = list(db.scalars(select(AuditLog).order_by(AuditLog.id.desc()).limit(limit)).all())
     return [
         {
-            "id": l.id,
-            "user_id": l.user_id,
-            "action": l.action,
-            "entity_type": l.entity_type,
-            "entity_id": l.entity_id,
-            "old_data": l.old_data,
-            "new_data": l.new_data,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "id": item.id,
+            "user_id": item.user_id,
+            "action": item.action,
+            "entity_type": item.entity_type,
+            "entity_id": item.entity_id,
+            "old_data": item.old_data,
+            "new_data": item.new_data,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
         }
-        for l in logs
+        for item in logs
     ]
+

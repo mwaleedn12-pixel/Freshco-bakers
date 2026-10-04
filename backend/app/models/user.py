@@ -4,11 +4,17 @@ Roles per SRS section 14: Customer, Cashier, Manager, Admin, Owner.
 """
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, String
+from typing import TYPE_CHECKING
+
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.branch import Address
+
 
 
 class Role(Base, IDMixin):

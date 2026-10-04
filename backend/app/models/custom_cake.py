@@ -3,11 +3,17 @@ Custom cake requests — customer submits, admin quotes and tracks status (secti
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import IDMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 
 class CustomCakeRequest(Base, IDMixin, TimestampMixin):

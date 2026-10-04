@@ -2,8 +2,6 @@
 Seed Script — Populates Freshco Bakers database with realistic demo data.
 Includes Users, Branches, Categories, Products, Inventory, Orders, POS Sales, Coupons, Custom Cakes, Reviews & Expenses.
 """
-import sys
-from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -55,11 +53,13 @@ def seed_data():
             return u
 
         owner = get_or_create_user("Waleed Owner", "owner@freshco.com", "owner", "+923000000001")
-        admin = get_or_create_user("Admin User", "admin@freshco.com", "admin", "+923000000002")
+        get_or_create_user("Admin User", "admin@freshco.com", "admin", "+923000000002")
         manager = get_or_create_user("Zain Manager", "manager@freshco.com", "manager", "+923000000003")
-        cashier = get_or_create_user("Ali Cashier", "cashier@freshco.com", "cashier", "+923000000004")
+        get_or_create_user("Ali Cashier", "cashier@freshco.com", "cashier", "+923000000004")
         cust1 = get_or_create_user("Sara Ahmed", "sara@gmail.com", "customer", "+923111111111")
         cust2 = get_or_create_user("Hamza Khan", "hamza@gmail.com", "customer", "+923222222222")
+
+
 
         # 3. Branches
         b_main = db.query(Branch).filter(Branch.code == "MAIN").first()
