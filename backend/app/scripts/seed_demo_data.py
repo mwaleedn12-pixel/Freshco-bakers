@@ -23,7 +23,7 @@ from app.models.user import Role, User
 def seed_data():
     db: Session = SessionLocal()
     try:
-        print("🌱 Seeding Freshco Bakers Demo Data...")
+        print("[+] Seeding Freshco Bakers Demo Data...")
 
         # 1. Roles
         role_names = ["customer", "cashier", "manager", "admin", "owner"]
@@ -83,13 +83,15 @@ def seed_data():
             ("Savory Bakes", "Puff pastries, quiches & chicken pies"),
         ]
         categories = {}
-        for cname, cdesc in cat_data:
+        for cname, _ in cat_data:
             c = db.query(Category).filter(Category.name == cname).first()
             if not c:
-                c = Category(name=cname, description=cdesc, status="active")
+                c_slug = cname.lower().replace("&", "and").replace(" ", "-").replace("--", "-")
+                c = Category(name=cname, slug=c_slug, status="active")
                 db.add(c)
                 db.flush()
             categories[cname] = c
+
 
         # 5. Products
         prod_list = [
@@ -179,10 +181,12 @@ def seed_data():
         for pdata in prod_list:
             p = db.query(Product).filter(Product.sku == pdata["sku"]).first()
             if not p:
+                p_slug = pdata["name"].lower().replace(" ", "-").replace("(", "").replace(")", "").replace("&", "and")
                 p = Product(
                     sku=pdata["sku"],
                     barcode=pdata["barcode"],
                     name=pdata["name"],
+                    slug=p_slug,
                     description=pdata["description"],
                     price=pdata["price"],
                     sale_price=pdata["sale_price"],
@@ -193,6 +197,7 @@ def seed_data():
                 )
                 db.add(p)
                 db.flush()
+
 
                 # Add stock to branch
                 inv = Inventory(product_id=p.id, branch_id=b_main.id, quantity=30, minimum_quantity=5)
@@ -341,8 +346,8 @@ def seed_data():
             )
 
         db.commit()
-        print("✅ Demo Data Seeded Successfully!")
-        print("\n🔑 Login Credentials Created:")
+        print("[SUCCESS] Demo Data Seeded Successfully!")
+        print("\n[KEYS] Login Credentials Created:")
         print("   Owner:    owner@freshco.com   / password123")
         print("   Admin:    admin@freshco.com   / password123")
         print("   Manager:  manager@freshco.com / password123")
@@ -351,9 +356,10 @@ def seed_data():
 
     except Exception as e:
         db.rollback()
-        print("❌ Seeding Error:", e)
+        print("[ERROR] Seeding Error:", e)
     finally:
         db.close()
+
 
 
 if __name__ == "__main__":
