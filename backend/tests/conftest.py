@@ -11,8 +11,17 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.middleware.rate_limit import _bucket
 from app.models.user import User
 from app.services.auth_service import get_or_create_role, issue_token
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limit_bucket():
+    """Reset the in-memory rate-limit counters before every test so tests
+    don't accumulate hits and trigger 429 Too Many Requests."""
+    _bucket._hits.clear()
+
 
 
 @pytest.fixture(autouse=True)

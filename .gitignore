@@ -21,3 +21,7 @@ frontend/pubspec.lock
 *.log
 .idea/
 .vscode/
+
+# --- Deployment ---
+nginx/certs/*.pem
+nginx/certs/*.key

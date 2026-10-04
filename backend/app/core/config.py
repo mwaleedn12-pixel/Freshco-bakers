@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     # Redis (optional, for caching / offline queue later)
     REDIS_URL: str | None = None
 
+    # Rate limiting
+    RATE_LIMIT_PER_MINUTE: int = 120
+    RATE_LIMIT_BURST: int = 30
+    RATE_LIMIT_ENABLED: bool = True
+
+    # Trusted hosts (production only — prevents host-header injection)
+    ALLOWED_HOSTS: list[str] = ["*"]
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
