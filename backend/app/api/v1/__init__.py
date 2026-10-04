@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     addresses, analytics, audit_logs, auth, branches, cart, categories, coupons, custom_cakes, customers,
     expenses, health, inventory, notifications, orders, payments, pos, products, reviews, settings, staff,
+    wishlist,
 )
 
 api_router = APIRouter()
@@ -28,4 +29,5 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["analytic
 api_router.include_router(pos.router, prefix="/pos", tags=["pos"])
 api_router.include_router(expenses.router, prefix="/expenses", tags=["expenses"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit logs"])
+api_router.include_router(wishlist.router, prefix="/wishlist", tags=["wishlist"])
 

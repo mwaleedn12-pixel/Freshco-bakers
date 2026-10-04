@@ -8,7 +8,10 @@ from decimal import Decimal
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
+from sqlalchemy import func
+
 from app.models.catalog import Category, Product, ProductImage
+from app.models.review import Review
 from app.models.user import User
 from app.services.audit_service import log_action, snapshot
 from app.services.errors import ServiceError
@@ -92,12 +95,32 @@ def _check_unique(db: Session, *, sku: str | None, barcode: str | None, exclude_
             raise ServiceError("A product with this barcode already exists", 409)
 
 
+def _attach_ratings(db: Session, products: list[Product]) -> list[Product]:
+    """Sets .average_rating / .review_count (plain attrs, not DB columns) from approved reviews."""
+    ids = [p.id for p in products]
+    if not ids:
+        return products
+    rows = (
+        db.query(Review.product_id, func.avg(Review.rating), func.count(Review.id))
+        .filter(Review.product_id.in_(ids), Review.status == "approved")
+        .group_by(Review.product_id)
+        .all()
+    )
+    stats = {pid: (float(avg), count) for pid, avg, count in rows}
+    for p in products:
+        avg, count = stats.get(p.id, (0.0, 0))
+        p.average_rating = round(avg, 1)
+        p.review_count = count
+    return products
+
+
 def get_product(db: Session, product_id: int, *, include_inactive: bool = False) -> Product:
     product = (
         db.query(Product).options(selectinload(Product.images)).filter(Product.id == product_id).first()
     )
     if product is None or (not include_inactive and product.status != "active"):
         raise ServiceError("Product not found", 404)
+    _attach_ratings(db, [product])
     return product
 
 
@@ -124,6 +147,7 @@ def list_products(
         q = q.filter(Product.is_featured == featured)
     total = q.count()
     items = q.order_by(Product.is_featured.desc(), Product.name).offset((page - 1) * limit).limit(limit).all()
+    _attach_ratings(db, items)
     return items, total
 
 

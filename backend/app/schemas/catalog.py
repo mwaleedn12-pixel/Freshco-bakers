@@ -91,6 +91,8 @@ class ProductOut(BaseModel):
     is_featured: bool
     is_available: bool
     images: list[ProductImageOut] = []
+    average_rating: float = 0.0
+    review_count: int = 0
 
     model_config = {"from_attributes": True}
 

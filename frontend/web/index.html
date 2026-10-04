@@ -55,7 +55,7 @@
       </nav>
 
       <div class="header-actions">
-        <div class="icon-btn" id="cart-btn" onclick="toggleCartDrawer()">
+        <div class="icon-btn" id="cart-btn" onclick="toggleCartModal()">
           <i class="fa-solid fa-basket-shopping"></i>
           <span class="badge" id="cart-count">0</span>
         </div>
@@ -99,6 +99,55 @@
       </div>
     </div>
   </div>
+
+  <!-- Cart Modal -->
+  <div class="modal-overlay" id="cart-modal">
+    <div class="modal-card" style="width:420px; max-width:92vw;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2><i class="fa-solid fa-basket-shopping"></i> Your Cart</h2>
+        <button class="btn-secondary" onclick="toggleCartModal()" style="padding:4px 10px;">✕</button>
+      </div>
+      <div id="cart-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Product Modal (Admin) -->
+  <div class="modal-overlay" id="product-modal">
+    <div class="modal-card" style="width:480px; max-width:92vw;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 id="product-modal-title">Add Product</h2>
+        <button class="btn-secondary" onclick="closeProductModal()" style="padding:4px 10px;">✕</button>
+      </div>
+      <form id="product-form" onsubmit="handleProductFormSubmit(event)">
+        <input type="hidden" id="pf-id">
+        <div class="form-group"><label class="form-label">Name</label><input id="pf-name" class="form-control" required></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group"><label class="form-label">SKU</label><input id="pf-sku" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Category</label><select id="pf-category" class="form-select"></select></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group"><label class="form-label">Price (Rs)</label><input id="pf-price" type="number" step="0.01" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Sale Price (optional)</label><input id="pf-sale-price" type="number" step="0.01" class="form-control"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><input id="pf-description" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Image URL (optional)</label><input id="pf-image-url" class="form-control" placeholder="https://..."></div>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center;">Save Product</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Product Details Modal -->
+  <div class="modal-overlay" id="details-modal">
+    <div class="modal-card" style="width:460px; max-width:92vw;">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+        <button class="btn-secondary" onclick="closeProductDetails()" style="padding:4px 10px;">✕</button>
+      </div>
+      <div id="details-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container"></div>
 
   <!-- Thermal Receipt Modal -->
   <div class="modal-overlay" id="receipt-modal">
