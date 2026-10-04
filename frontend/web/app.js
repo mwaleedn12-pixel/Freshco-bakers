@@ -459,13 +459,25 @@ function renderCartModal() {
       '<button class="icon-link-btn" onclick="cartRemove(' + i.product_id + ')"><i class="fa-solid fa-trash"></i></button>' +
     '</div>').join('');
 
+  const defaultPhone = (state.user && state.user.phone) ? state.user.phone : '03348984654';
+  const defaultName = (state.user && state.user.name) ? state.user.name : '';
+
   body.innerHTML = rows +
     '<div style="display:flex; justify-content:space-between; margin:16px 0; font-size:18px; font-weight:800;"><span>Total</span><span style="color:var(--primary);">' + money(total) + '</span></div>' +
-    '<div class="form-group"><label class="form-label">Order Type</label>' +
-      '<select id="checkout-order-type" class="form-select"><option value="PICKUP">Pickup from bakery</option><option value="DELIVERY">Delivery</option></select></div>' +
-    '<div class="form-group" id="checkout-address-group" style="display:none;"><label class="form-label">Delivery Address</label>' +
-      '<input type="text" id="checkout-address" class="form-control" placeholder="House, street, city"></div>' +
-    '<button class="btn-primary" style="width:100%; justify-content:center; padding:14px;" onclick="handleCheckout()"><i class="fa-solid fa-circle-check"></i> Place Order</button>';
+    '<div style="background:var(--card-bg, #f8f9fa); border:1px solid var(--border-color, #e9ecef); border-radius:10px; padding:14px; margin-bottom:16px;">' +
+      '<div style="font-weight:700; font-size:14px; margin-bottom:10px; color:var(--text);"><i class="fa-brands fa-whatsapp" style="color:#25D366; margin-right:6px;"></i> WhatsApp & Delivery Details</div>' +
+      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label">Customer Name</label>' +
+        '<input type="text" id="checkout-name" class="form-control" placeholder="Your full name" value="' + escapeHtml(defaultName) + '"></div>' +
+      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label">WhatsApp Mobile Number <span style="color:var(--primary); font-size:11px;">(For live order updates)</span></label>' +
+        '<input type="tel" id="checkout-phone" class="form-control" placeholder="e.g. 03348984654" value="' + escapeHtml(defaultPhone) + '" required></div>' +
+      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label">Order Type</label>' +
+        '<select id="checkout-order-type" class="form-select"><option value="PICKUP">Pickup from Bakery Counter</option><option value="DELIVERY">Home Delivery</option></select></div>' +
+      '<div class="form-group" id="checkout-address-group" style="display:none; margin-bottom:10px;"><label class="form-label">Delivery Address</label>' +
+        '<input type="text" id="checkout-address" class="form-control" placeholder="House, street, area, city"></div>' +
+      '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Special Instructions / Cake Writing</label>' +
+        '<input type="text" id="checkout-notes" class="form-control" placeholder="e.g. Write Happy Birthday, less sugar, etc."></div>' +
+    '</div>' +
+    '<button class="btn-primary" style="width:100%; justify-content:center; padding:14px; font-weight:700;" onclick="handleCheckout()"><i class="fa-solid fa-circle-check"></i> Confirm & Place Order</button>';
 
   document.getElementById('checkout-order-type').onchange = function (e) {
     document.getElementById('checkout-address-group').style.display = e.target.value === 'DELIVERY' ? 'block' : 'none';
@@ -477,7 +489,16 @@ async function handleCheckout() {
   if (!requireLogin('Please sign in to place an order.')) return;
 
   const orderType = document.getElementById('checkout-order-type').value;
+  const customerName = document.getElementById('checkout-name').value.trim();
+  const customerPhone = document.getElementById('checkout-phone').value.trim();
+  const notes = document.getElementById('checkout-notes') ? document.getElementById('checkout-notes').value.trim() : null;
   let addressId = null;
+
+  if (!customerPhone) {
+    showToast('Please enter your WhatsApp mobile number for order confirmation.', 'error');
+    document.getElementById('checkout-phone').focus();
+    return;
+  }
 
   try {
     if (orderType === 'DELIVERY') {
@@ -490,12 +511,21 @@ async function handleCheckout() {
     for (const item of state.cart) {
       await apiFetch('/cart/items', { method: 'POST', body: { product_id: item.product_id, quantity: item.quantity } });
     }
-    const order = await apiFetch('/orders', { method: 'POST', body: { order_type: orderType, address_id: addressId } });
+    const order = await apiFetch('/orders', {
+      method: 'POST',
+      body: {
+        order_type: orderType,
+        address_id: addressId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        notes: notes
+      }
+    });
 
     state.cart = [];
     updateCartBadge();
     document.getElementById('cart-modal').classList.remove('active');
-    showToast('Order ' + order.order_number + ' placed! Track it under "Track Orders".', 'success');
+    showToast('Order ' + order.order_number + ' placed! Confirmation sent to WhatsApp ' + customerPhone, 'success');
     switchTab('orders');
   } catch (e) {
     showToast(e.message, 'error');

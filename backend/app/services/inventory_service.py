@@ -17,6 +17,7 @@ from app.models.user import User
 from app.services.audit_service import log_action
 from app.services.errors import ServiceError
 from app.services.notification_service import notify_staff
+from app.services import webhook_service
 
 SIGN = {T.PURCHASE: 1, T.RETURN: 1, T.WASTE: -1}  # ADJUSTMENT is signed by the caller
 
@@ -58,9 +59,23 @@ def _record(db: Session, inv: Inventory, type_: T, delta: int, user_id: int | No
 def _low_stock_alert(db: Session, inv: Inventory) -> None:
     if inv.minimum_quantity > 0 and (inv.quantity - inv.reserved_quantity) <= inv.minimum_quantity:
         product = db.get(Product, inv.product_id)
+        branch = db.get(Branch, inv.branch_id)
         name = product.name if product else f"Product #{inv.product_id}"
+        sku = product.sku if product else ""
         notify_staff(db, "Low stock", f"{name} is low: {inv.quantity - inv.reserved_quantity} available "
                                       f"(minimum {inv.minimum_quantity})", "low_stock")
+        try:
+            webhook_service.dispatch_low_stock_alert(
+                product_id=inv.product_id,
+                product_name=name,
+                sku=sku,
+                branch_id=inv.branch_id,
+                branch_name=branch.name if branch else "Bakery Branch",
+                current_quantity=inv.quantity - inv.reserved_quantity,
+                minimum_quantity=inv.minimum_quantity,
+            )
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------- admin actions

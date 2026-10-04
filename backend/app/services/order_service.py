@@ -28,7 +28,7 @@ from app.models.order import (
 )
 from app.models.setting import Setting
 from app.models.user import User
-from app.services import cart_service, inventory_service
+from app.services import cart_service, inventory_service, webhook_service
 from app.services.notification_service import notify, notify_staff
 from app.services.errors import ServiceError
 from app.services.pricing import effective_price, q2
@@ -91,6 +91,12 @@ def checkout(db: Session, user: User, req) -> Order:
     cart = cart_service.get_or_create_cart(db, user)
     if not cart.items:
         raise ServiceError("Your cart is empty", 400)
+
+    # If customer provided name / phone during checkout, update profile
+    if getattr(req, "customer_phone", None) and req.customer_phone.strip():
+        user.phone = req.customer_phone.strip()
+    if getattr(req, "customer_name", None) and req.customer_name.strip():
+        user.name = req.customer_name.strip()
 
     # --- address / branch / schedule
     address_id = None
@@ -186,6 +192,46 @@ def checkout(db: Session, user: User, req) -> Order:
 
     cart.items.clear()
     db.commit()
+
+    # Trigger n8n Automation Webhook (non-blocking)
+    try:
+        items_payload = [
+            {
+                "product_id": item_line["product"].id,
+                "name": item_line["product"].name,
+                "quantity": item_line["quantity"],
+                "unit_price": float(item_line["price"]),
+                "total": float(item_line["total"]),
+            }
+            for item_line in lines
+        ]
+        addr_text = None
+        if address:
+            addr_parts = [p for p in [address.recipient_name or user.name, address.street_address, address.area, address.city] if p]
+            addr_text = ", ".join(addr_parts)
+
+        webhook_service.dispatch_order_created(
+            order_id=order.id,
+            order_number=order.order_number,
+            customer_name=user.name or "Customer",
+            customer_phone=user.phone or "",
+            customer_email=user.email,
+            order_source=order.order_source.value if hasattr(order.order_source, "value") else str(order.order_source),
+            order_type=order.order_type.value if hasattr(order.order_type, "value") else str(order.order_type),
+            items=items_payload,
+            subtotal=float(subtotal),
+            discount=float(discount),
+            tax=float(tax),
+            delivery_fee=float(delivery_fee),
+            total_amount=float(total),
+            payment_method=req.payment_method,
+            branch_name=branch.name if branch else "Main Bakery",
+            delivery_address=addr_text,
+            special_instructions=req.notes,
+        )
+    except Exception:
+        pass
+
     return _load_order(db, order.id)
 
 

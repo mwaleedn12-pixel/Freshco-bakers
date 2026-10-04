@@ -22,7 +22,7 @@ from app.models.order import (
     Order, OrderStatus as S, OrderStatusHistory, OrderType, PaymentMethod, PaymentStatus,
 )
 from app.models.user import User
-from app.services import inventory_service
+from app.services import inventory_service, webhook_service
 from app.services.audit_service import log_action
 from app.services.errors import ServiceError
 from app.services.notification_service import notify
@@ -125,6 +125,23 @@ def change_status(db: Session, *, user: User, order_id: int, new_status: S, note
                old_data={"status": old.value}, new_data={"status": new_status.value, "note": note})
     db.commit()
     db.expire_all()
+
+    # Trigger n8n Automation Webhook (non-blocking)
+    try:
+        customer = db.get(User, order.customer_id) if order.customer_id else None
+        webhook_service.dispatch_order_status_updated(
+            order_id=order.id,
+            order_number=order.order_number,
+            old_status=old.value if hasattr(old, "value") else str(old),
+            new_status=new_status.value if hasattr(new_status, "value") else str(new_status),
+            customer_name=customer.name if customer else "Valued Customer",
+            customer_phone=customer.phone if customer else None,
+            customer_email=customer.email if customer else None,
+            note=note,
+        )
+    except Exception:
+        pass
+
     return _load(db, order_id)
 
 

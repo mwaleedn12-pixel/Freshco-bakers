@@ -1,0 +1,336 @@
+{
+  "name": "Freshco Bakers - Master Order Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "freshco-events",
+        "options": {}
+      },
+      "name": "Webhook Trigger (Events)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        340
+      ],
+      "id": "webhook-trigger-main"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bakery-order",
+        "options": {}
+      },
+      "name": "Direct Order Webhook (/bakery-order)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        540
+      ],
+      "id": "webhook-trigger-direct"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise direct bakery-order vs standard envelope events\nconst item = $input.first().json;\nconst body = item.body || item;\n\nlet event = body.event || 'order.created';\nlet data = body.data || body;\n\n// Format items list into clear readable text\nlet itemsList = '';\nif (Array.isArray(data.items)) {\n  itemsList = data.items.map(it => `• ${it.name || it.product_name} x${it.quantity} (Rs. ${Number(it.unit_price || it.price || 0).toLocaleString()})`).join('\\n');\n} else {\n  itemsList = data.items_summary || 'Bakery Items';\n}\n\nconst totalAmount = (data.financials ? data.financials.total_amount : data.total) || 0;\nconst customerName = (data.customer ? data.customer.name : data.customer_name) || 'Valued Customer';\nconst customerPhone = (data.customer ? data.customer.phone : data.phone) || '';\nconst address = data.delivery_address || data.address || 'Counter Pickup';\nconst paymentMethod = (data.financials ? data.financials.payment_method : data.payment_method) || 'Cash on Delivery (COD)';\nconst orderNumber = data.order_number || ('FB-' + (data.order_id || Date.now()));\n\nreturn {\n  json: {\n    event: event,\n    order_number: orderNumber,\n    order_id: data.order_id,\n    customer_name: customerName,\n    customer_phone: customerPhone,\n    delivery_address: address,\n    payment_method: paymentMethod,\n    total_amount: totalAmount,\n    items_formatted: itemsList,\n    raw_data: data\n  }\n};\n"
+      },
+      "name": "Normalize & Format Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        420
+      ],
+      "id": "code-normalizer"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.event }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "order.created"
+            },
+            {
+              "value2": "order.status_updated"
+            },
+            {
+              "value2": "inventory.low_stock"
+            },
+            {
+              "value2": "custom_cake.requested"
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      },
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        680,
+        420
+      ],
+      "id": "switch-event-router"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare WhatsApp Message for Customer\nconst d = $input.first().json;\n\nconst customerMessage = `🍰 *FRESHCO BAKERS — ORDER CONFIRMATION* 🍰\\n\\n` +\n  `Assalam-o-Alaikum *${d.customer_name}*!\\n` +\n  `Aapka order receive ho chuka hai aur kitchen mein process ho raha hai.\\n\\n` +\n  `📋 *Order ID:* #${d.order_number}\\n` +\n  `🎂 *Items:*\\n${d.items_formatted}\\n\\n` +\n  `💰 *Total Amount:* Rs. ${Number(d.total_amount).toLocaleString()}\\n` +\n  `💳 *Payment Method:* ${d.payment_method}\\n` +\n  `📍 *Delivery Address:* ${d.delivery_address}\\n\\n` +\n  `⏱️ *Estimated Time:* 45 - 60 Minutes\\n` +\n  `🚚 *Live Track Order:* http://freshcobakers.com/orders/${d.order_id || ''}\\n\\n` +\n  `Thank you for choosing Freshco Bakers!\\nFresh bakes, always fresh taste! ❤️`;\n\n// Prepare WhatsApp & Telegram Message for Bakery Owner / Kitchen Display\nconst ownerMessage = `🔔 *NEW BAKERY ORDER RECEIVED!* 🔔\\n\\n` +\n  `*Order ID:* #${d.order_number}\\n` +\n  `*Customer:* ${d.customer_name} (${d.customer_phone})\\n` +\n  `*Type / Address:* ${d.delivery_address}\\n` +\n  `*Payment:* ${d.payment_method} - *Rs. ${Number(d.total_amount).toLocaleString()}*\\n\\n` +\n  `*Order Details:*\\n${d.items_formatted}\\n\\n` +\n  `👉 Open Kitchen POS to accept & start baking!`;\n\nreturn {\n  json: {\n    ...d,\n    customer_whatsapp_text: customerMessage,\n    owner_alert_text: ownerMessage\n  }\n};\n"
+      },
+      "name": "Build Order Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        220
+      ],
+      "id": "code-build-order-msg"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.ultramsg.com/INSTANCE_ID/messages/chat",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"token\": \"YOUR_ULTRAMSG_OR_WHATSAPP_TOKEN\",\n  \"to\": \"{{ $json.customer_phone }}\",\n  \"body\": \"{{ $json.customer_whatsapp_text }}\"\n}"
+      },
+      "name": "Send WhatsApp to Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        140
+      ],
+      "id": "http-whatsapp-customer"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"chat_id\": \"YOUR_TELEGRAM_CHAT_ID\",\n  \"text\": \"{{ $json.owner_alert_text }}\",\n  \"parse_mode\": \"Markdown\"\n}"
+      },
+      "name": "Alert Bakery Owner / Kitchen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        300
+      ],
+      "id": "http-alert-owner"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Status Update Notification\nconst d = $input.first().json.raw_data;\nconst status = d.new_status || 'CONFIRMED';\nconst orderNumber = d.order_number || ('FB-' + d.order_id);\nconst customerName = (d.customer ? d.customer.name : 'Valued Customer');\nconst customerPhone = (d.customer ? d.customer.phone : '');\n\nconst statusUrdu = {\n  'CONFIRMED': 'Bakery ne aapka order confirm kar liya hai! 🧑‍🍳',\n  'PREPARING': 'Aapka order oven mein bake ho raha hai! 🎂🔥',\n  'READY': 'Aapka order pack ho kar ready hai! 📦✨',\n  'OUT_FOR_DELIVERY': 'Rider order le kar nikal chuka hai! 🛵💨',\n  'DELIVERED': 'Order deliver ho gaya hai. Enjoy your delicious treats! 🍰🎉',\n  'CANCELLED': 'Aapka order cancel kar diya gaya hai.'\n};\n\nconst msg = `*FRESHCO BAKERS — ORDER STATUS UPDATE*\\n\\n` +\n  `Dear *${customerName}*,\\n` +\n  `Order #${orderNumber}: *${statusUrdu[status] || status}*\\n\\n` +\n  `Track status: ${d.tracking_url || 'http://freshcobakers.com'}`;\n\nreturn {\n  json: {\n    customer_phone: customerPhone,\n    status: status,\n    status_message: msg\n  }\n};\n"
+      },
+      "name": "Build Status Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        420
+      ],
+      "id": "code-status-msg"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.ultramsg.com/INSTANCE_ID/messages/chat",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"token\": \"YOUR_ULTRAMSG_TOKEN\",\n  \"to\": \"{{ $json.customer_phone }}\",\n  \"body\": \"{{ $json.status_message }}\"\n}"
+      },
+      "name": "Send Status WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        420
+      ],
+      "id": "http-whatsapp-status"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Low Stock Alert Message\nconst d = $input.first().json.raw_data;\nconst msg = `⚠️ *URGENT INVENTORY ALERT — LOW STOCK* ⚠️\\n\\n` +\n  `*Product:* ${d.product_name} (SKU: ${d.sku || 'N/A'})\\n` +\n  `*Branch:* ${d.branch_name}\\n` +\n  `*Available Stock:* ${d.current_quantity} units left\\n` +\n  `*Safety Minimum:* ${d.minimum_quantity} units\\n` +\n  `*Deficit Needed:* ${d.deficit || 1} units\\n\\n` +\n  `👉 Please create a production batch or restock immediately!`;\n\nreturn {\n  json: {\n    alert_text: msg\n  }\n};\n"
+      },
+      "name": "Build Low Stock Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        560
+      ],
+      "id": "code-low-stock-msg"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"chat_id\": \"YOUR_TELEGRAM_CHAT_ID\",\n  \"text\": \"{{ $json.alert_text }}\",\n  \"parse_mode\": \"Markdown\"\n}"
+      },
+      "name": "Alert Manager (Low Stock)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        560
+      ],
+      "id": "http-alert-low-stock"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Custom Cake Message for Baker & Customer\nconst d = $input.first().json.raw_data;\nconst msg = `🎂 *NEW CUSTOM CAKE DESIGN REQUEST* 🎂\\n\\n` +\n  `*Request ID:* #${d.cake_id}\\n` +\n  `*Customer:* ${d.customer ? d.customer.name : 'Customer'} (${d.customer ? d.customer.phone : ''})\\n` +\n  `*Flavour:* ${d.cake_details ? d.cake_details.flavour : 'Custom'}\\n` +\n  `*Size / Weight:* ${d.cake_details ? d.cake_details.type : 'Custom'}\\n` +\n  `*Needed By Date:* ${d.cake_details ? d.cake_details.requested_date : 'Urgent'}\\n\\n` +\n  `👉 Open Admin Panel to review picture & provide quotation quote!`;\n\nreturn {\n  json: {\n    alert_text: msg\n  }\n};\n"
+      },
+      "name": "Build Custom Cake Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        700
+      ],
+      "id": "code-custom-cake-msg"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"chat_id\": \"YOUR_TELEGRAM_CHAT_ID\",\n  \"text\": \"{{ $json.alert_text }}\",\n  \"parse_mode\": \"Markdown\"\n}"
+      },
+      "name": "Alert Master Baker (Cake)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        700
+      ],
+      "id": "http-alert-cake"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger (Events)": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Format Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Direct Order Webhook (/bakery-order)": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Format Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Format Payload": {
+      "main": [
+        [
+          {
+            "node": "Route by Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Event Type": {
+      "main": [
+        [
+          {
+            "node": "Build Order Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Status Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Low Stock Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Custom Cake Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Order Messages": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp to Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Alert Bakery Owner / Kitchen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Status Message": {
+      "main": [
+        [
+          {
+            "node": "Send Status WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Low Stock Alert": {
+      "main": [
+        [
+          {
+            "node": "Alert Manager (Low Stock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Custom Cake Alert": {
+      "main": [
+        [
+          {
+            "node": "Alert Master Baker (Cake)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

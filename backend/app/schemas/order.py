@@ -14,6 +14,8 @@ class CheckoutRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=500)
     coupon_code: str | None = Field(default=None, max_length=50)
     payment_method: Literal["CASH", "ONLINE"] = "CASH"
+    customer_name: str | None = Field(default=None, max_length=150)
+    customer_phone: str | None = Field(default=None, max_length=30)
 
 
 class OrderItemOut(BaseModel):

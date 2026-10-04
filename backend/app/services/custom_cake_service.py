@@ -14,6 +14,7 @@ from app.models.user import User
 from app.services.audit_service import log_action, snapshot
 from app.services.errors import ServiceError
 from app.services.notification_service import notify, notify_staff
+from app.services import webhook_service
 
 ADMIN_TRANSITIONS = {
     "pending": {"quoted", "rejected", "cancelled"},
@@ -54,6 +55,23 @@ def create_request(db: Session, user: User, data: dict) -> CustomCakeRequest:
            "We will review your request and send you a quotation soon.", "custom_cake")
     db.commit()
     db.refresh(req)
+
+    # Trigger n8n Automation Webhook
+    try:
+        webhook_service.dispatch_custom_cake_event(
+            cake_id=req.id,
+            customer_name=user.name or "Customer",
+            customer_phone=user.phone or "",
+            flavour=req.flavour,
+            cake_type=req.size,
+            requested_date=str(req.requested_date),
+            quote_amount=float(req.quote_amount) if req.quote_amount else None,
+            status=req.status,
+            event_type="requested",
+        )
+    except Exception:
+        pass
+
     return req
 
 
@@ -89,6 +107,24 @@ def quote(db: Session, *, user: User, request_id: int, amount: float, notes: str
                entity_id=req.id, old_data=old, new_data=snapshot(req))
     db.commit()
     db.refresh(req)
+
+    # Trigger n8n webhook
+    try:
+        customer = db.get(User, req.customer_id)
+        webhook_service.dispatch_custom_cake_event(
+            cake_id=req.id,
+            customer_name=customer.name if customer else "Customer",
+            customer_phone=customer.phone if customer else "",
+            flavour=req.flavour,
+            cake_type=req.size,
+            requested_date=str(req.requested_date),
+            quote_amount=float(req.quote_amount) if req.quote_amount else None,
+            status="quoted",
+            event_type="quoted",
+        )
+    except Exception:
+        pass
+
     return req
 
 
@@ -106,6 +142,24 @@ def admin_change_status(db: Session, *, user: User, request_id: int, new_status:
                entity_id=req.id, old_data=old, new_data=snapshot(req))
     db.commit()
     db.refresh(req)
+
+    # Trigger n8n webhook
+    try:
+        customer = db.get(User, req.customer_id)
+        webhook_service.dispatch_custom_cake_event(
+            cake_id=req.id,
+            customer_name=customer.name if customer else "Customer",
+            customer_phone=customer.phone if customer else "",
+            flavour=req.flavour,
+            cake_type=req.size,
+            requested_date=str(req.requested_date),
+            quote_amount=float(req.quote_amount) if req.quote_amount else None,
+            status=new_status,
+            event_type="status_changed",
+        )
+    except Exception:
+        pass
+
     return req
 
 

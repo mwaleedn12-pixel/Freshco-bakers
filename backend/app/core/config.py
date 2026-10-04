@@ -38,7 +38,14 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # n8n Automation Webhooks
+    N8N_ENABLED: bool = True
+    N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/freshco-events"
+    N8N_WEBHOOK_SECRET: str = "freshco-n8n-secret-key-2026"
+    N8N_TIMEOUT_SECONDS: float = 3.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
 
 
 @lru_cache
