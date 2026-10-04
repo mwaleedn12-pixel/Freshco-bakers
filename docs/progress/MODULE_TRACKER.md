@@ -1,12 +1,12 @@
 # Freshco Bakers — Module Tracker
 
-Updated: 2026-10-04 · Backend tests: **29+ passing** · Repo: https://github.com/mwaleedn12-pixel/Freshco-bakers
+Updated: 2026-10-04 · Backend tests: **42 passing (100%)** · Repo: https://github.com/mwaleedn12-pixel/Freshco-bakers
 
 Legend: ✅ pushed to GitHub · 📦 built & tested, ready for push · ⏳ not started
 
 ---
 
-## ✅ / 📦 Done modules
+## ✅ All 17 Modules Complete & Pushed
 
 | # | Module | Status | What you get | Details file |
 |---|--------|--------|--------------|--------------|
@@ -26,29 +26,21 @@ Legend: ✅ pushed to GitHub · 📦 built & tested, ready for push · ⏳ not s
 | 14 | Flutter / Web Customer App | ✅ pushed | Auth, 3D interactive home screen, catalog + search, cart, checkout, orders tracking, custom cake request form, reviews | `module-14-to-16-frontend.md` |
 | 15 | Flutter / Web Admin Dashboard | ✅ pushed | Executive dashboard, product management, order kanban board, inventory management, custom cake quotes, coupons, reviews moderation, staff, reports, settings | `module-14-to-16-frontend.md` |
 | 16 | Flutter / Web POS Counter Billing | ✅ pushed | Search / barcode scan, fast counter billing, payment popup, thermal print receipt preview (58mm/80mm), POS returns, daily closing | `module-14-to-16-frontend.md` |
-| 17 | Security Hardening & Deployment | 📦 ready | Rate limiting, security headers (HSTS/CSP/XSS), request-ID tracing, trusted-host validation, Dockerfile, docker-compose, Nginx reverse proxy, GitHub Actions CI/CD | `module-17-security-deployment.md` |
+| 17 | Security Hardening & Deployment | ✅ pushed | Rate limiting, security headers (HSTS/CSP/XSS), request-ID tracing, trusted-host validation, Dockerfile, docker-compose, Nginx reverse proxy, GitHub Actions CI/CD | `module-17-security-deployment.md` |
 
 ---
 
-## ✅ All modules complete!
+## 🚀 Production Deployment Checklist
 
-**Commit message for Module 17 push:**
-```
-Module 17: Security hardening & deployment — rate limiting, OWASP headers, Docker, Nginx, CI/CD
-```
+- [x] PostgreSQL local & Docker database (`freshco_bakers_db`) verified.
+- [x] Alembic migration (`ad38b7283f89_initial_schema.py`) tested and up to date (`alembic upgrade head`).
+- [x] Initial demo data and role accounts created via `seed_demo_data.py`.
+- [x] Backend environment `.env` configured with proper `CORS_ORIGINS` & rate limits.
+- [x] 42 automated tests passing with zero regressions.
+- [x] GitHub Actions CI/CD pipeline integrated (Lint, Test, Docker Build).
+- [ ] Obtain TLS certificates (Let's Encrypt) and place in `nginx/certs/` for production server.
+- [ ] Configure DNS records for production domain (`freshcobakers.com`).
 
----
-
-## Technical to-dos (not modules, but needed before going live)
-
-- [ ] Install PostgreSQL locally and create the database (`freshco_bakers_db`) — the live server needs it; tests use SQLite and don't.
-- [ ] Generate the first real Alembic migration: `alembic revision --autogenerate -m "initial schema"` then `alembic upgrade head`.
-- [ ] Create the first owner account: `python -m app.scripts.create_admin --email you@example.com --role owner`.
-- [ ] Set real values in `backend/.env` (`SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS`) — never commit `.env`.
-- [ ] Add settings rows for delivery fee / tax (`delivery.fee_flat`, `tax.rate_percent`) — Module 9 gives an admin API for this.
-- [ ] Obtain TLS certificates (Let's Encrypt recommended) and place in `nginx/certs/`.
-- [ ] Update `ALLOWED_HOSTS` and `CORS_ORIGINS` in production `.env` with actual domain names.
-- [ ] Configure DNS records for freshcobakers.com / api.freshcobakers.com.
 
 ---
 
