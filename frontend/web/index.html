@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Freshco Bakers — Digital Management Platform</title>
+  <title>Freshco Bakers — Premium Artisanal Bakery & Cake Studio</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -11,14 +11,26 @@
 
   <!-- Presentation Role Switcher Bar -->
   <div class="presentation-bar">
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <i class="fa-solid fa-graduation-cap" style="color:var(--accent);"></i>
-      <strong>Freshco Bakers — Web Tech Presentation Platform</strong>
+      <strong>Freshco Bakers — Digital Management Platform</strong>
+      <span id="presentation-user-badge"></span>
     </div>
     <div class="role-switcher">
-      <button class="role-btn active" id="btn-role-customer" onclick="switchRole('customer')"><i class="fa-solid fa-store"></i> Customer Portal</button>
+      <button class="role-btn active" id="btn-role-customer" onclick="switchRole('customer')"><i class="fa-solid fa-store"></i> Customer Website</button>
       <button class="role-btn" id="btn-role-admin" onclick="switchRole('admin')"><i class="fa-solid fa-chart-line"></i> Admin Dashboard</button>
       <button class="role-btn" id="btn-role-pos" onclick="switchRole('pos')"><i class="fa-solid fa-cash-register"></i> POS Counter Billing</button>
+    </div>
+  </div>
+
+  <!-- Announcement & Contact Strip -->
+  <div class="top-announcement-strip" id="top-announcement-strip">
+    <div class="announcement-content">
+      <span><i class="fa-solid fa-truck-fast"></i> <strong>Free Delivery</strong> on orders over Rs. 1,500</span>
+      <span class="announcement-divider">•</span>
+      <span><i class="fa-solid fa-clock"></i> <strong>Hot Sourdough & Croissants:</strong> Ready at 7:00 AM & 4:00 PM</span>
+      <span class="announcement-divider">•</span>
+      <span><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> Helpline & WhatsApp: <strong>0334-8984654</strong></span>
     </div>
   </div>
 
@@ -27,17 +39,22 @@
     <div class="header-container">
       <a href="#" class="brand-logo" onclick="switchTab('home')">
         <div class="brand-icon"><i class="fa-solid fa-wheat-awn"></i></div>
-        <span>Freshco Bakers</span>
+        <div class="brand-text">
+          <span class="brand-title">Freshco Bakers</span>
+          <span class="brand-tagline">Artisanal Bakery &amp; Cake Studio</span>
+        </div>
       </a>
 
       <!-- Nav Links for Customer View -->
       <nav id="customer-nav">
         <ul class="nav-links">
-          <li><a class="nav-link active" onclick="switchTab('home')" id="nav-home">Home</a></li>
-          <li><a class="nav-link" onclick="switchTab('catalog')" id="nav-catalog">Catalog</a></li>
-          <li><a class="nav-link" onclick="switchTab('cake')" id="nav-cake">Custom Cakes</a></li>
-          <li><a class="nav-link" onclick="switchTab('orders')" id="nav-orders">Track Orders</a></li>
-          <li><a class="nav-link" onclick="switchTab('reviews')" id="nav-reviews">Reviews</a></li>
+          <li><a class="nav-link active" onclick="switchTab('home')" id="nav-home"><i class="fa-solid fa-house"></i> Home</a></li>
+          <li><a class="nav-link" onclick="switchTab('catalog')" id="nav-catalog"><i class="fa-solid fa-cookie-bite"></i> Fresh Menu</a></li>
+          <li><a class="nav-link" onclick="switchTab('cake')" id="nav-cake"><i class="fa-solid fa-cake-candles"></i> Custom Cakes</a></li>
+          <li><a class="nav-link" onclick="switchTab('stores')" id="nav-stores"><i class="fa-solid fa-location-dot"></i> Store Locator</a></li>
+          <li><a class="nav-link" onclick="switchTab('orders')" id="nav-orders"><i class="fa-solid fa-truck-ramp-box"></i> Track Order</a></li>
+          <li><a class="nav-link" onclick="switchTab('reviews')" id="nav-reviews"><i class="fa-solid fa-star"></i> Reviews</a></li>
+          <li><a class="nav-link" onclick="switchTab('about')" id="nav-about"><i class="fa-solid fa-heart"></i> Our Story</a></li>
         </ul>
       </nav>
 
@@ -55,7 +72,7 @@
       </nav>
 
       <div class="header-actions">
-        <div class="icon-btn" id="cart-btn" onclick="toggleCartModal()">
+        <div class="icon-btn" id="cart-btn" onclick="toggleCartModal()" title="View Cart">
           <i class="fa-solid fa-basket-shopping"></i>
           <span class="badge" id="cart-count">0</span>
         </div>
@@ -96,6 +113,27 @@
       <div style="margin-top:16px; text-align:center; font-size:14px;">
         <span id="auth-toggle-text">Don't have an account?</span>
         <a href="#" onclick="toggleAuthMode()" style="color:var(--primary); font-weight:700; text-decoration:none;" id="auth-toggle-link">Register Now</a>
+      </div>
+
+      <!-- Quick Demo Account Fill -->
+      <div style="margin-top:20px; padding-top:16px; border-top:1px dashed var(--border);">
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px; text-align:center; font-weight:600;">
+          Quick Demo Login:
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+          <button type="button" class="btn-secondary btn-sm" onclick="quickFillAuth('sara@gmail.com', 'password123', 'customer')">
+            <i class="fa-solid fa-user"></i> Customer (Sara)
+          </button>
+          <button type="button" class="btn-secondary btn-sm" onclick="quickFillAuth('cashier@freshco.com', 'password123', 'pos')">
+            <i class="fa-solid fa-cash-register"></i> Cashier (Ali)
+          </button>
+          <button type="button" class="btn-secondary btn-sm" onclick="quickFillAuth('admin@freshco.com', 'password123', 'admin')">
+            <i class="fa-solid fa-shield-halved"></i> Admin
+          </button>
+          <button type="button" class="btn-secondary btn-sm" onclick="quickFillAuth('owner@freshco.com', 'password123', 'admin')">
+            <i class="fa-solid fa-crown"></i> Owner (Waleed)
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -162,6 +200,89 @@
       </button>
     </div>
   </div>
+
+  <!-- Floating WhatsApp Quick Order Widget -->
+  <div class="whatsapp-float-widget" id="whatsapp-float-widget">
+    <a href="https://wa.me/923348984654?text=Hi%20Freshco%20Bakers!%20I%20would%20like%20to%20place%20an%20order%20or%20inquire%20about%20today%27s%20fresh%20baked%20items." target="_blank" class="whatsapp-btn" title="Chat on WhatsApp / Fast Order">
+      <i class="fa-brands fa-whatsapp"></i>
+      <span class="whatsapp-tooltip">Chat &amp; Order Fast</span>
+    </a>
+  </div>
+
+  <!-- Website Footer -->
+  <footer class="app-footer" id="app-footer">
+    <div class="footer-container">
+      <div class="footer-grid">
+        <div class="footer-col brand-col">
+          <div class="brand-logo footer-logo">
+            <div class="brand-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+            <div class="brand-text">
+              <span class="brand-title">Freshco Bakers</span>
+              <span class="brand-tagline">Pure Artisanal Indulgence</span>
+            </div>
+          </div>
+          <p class="footer-desc">Crafting hand-baked artisan sourdoughs, French viennoiserie, gourmet celebration cakes and savoury delicacies with 100% pure European butter and love.</p>
+          <div class="halal-badge"><i class="fa-solid fa-certificate"></i> 100% Halal &amp; ISO 22000 Certified Kitchen</div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Explore Menu</h4>
+          <ul class="footer-links">
+            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Cakes');">Celebration Cakes</a></li>
+            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Breads');">Artisan Sourdough &amp; Breads</a></li>
+            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Pastries');">Croissants &amp; Viennoiserie</a></li>
+            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Savory');">Savouries &amp; Quiches</a></li>
+            <li><a href="#" onclick="switchTab('cake')">Custom Cake Studio</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Bakery Hours &amp; Locations</h4>
+          <div class="footer-info-item">
+            <i class="fa-solid fa-location-dot"></i>
+            <div><strong>Gulberg III (Flagship):</strong><br>MM Alam Road, Lahore (8:00 AM – Midnight)</div>
+          </div>
+          <div class="footer-info-item">
+            <i class="fa-solid fa-location-dot"></i>
+            <div><strong>DHA Phase 5:</strong><br>Commercial Area, Lahore (8:00 AM – 1:00 AM)</div>
+          </div>
+          <div class="footer-info-item">
+            <i class="fa-solid fa-phone"></i>
+            <div><strong>Direct Hotline:</strong><br>0334-8984654 / 042-35889900</div>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Join The Freshco Club</h4>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Subscribe to get early morning bake alerts and 10% off your next online order.</p>
+          <form onsubmit="handleNewsletterSubmit(event)" class="newsletter-form">
+            <input type="email" id="newsletter-email" placeholder="Your email address" required class="form-control">
+            <button type="submit" class="btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+          </form>
+          <div style="margin-top:16px;">
+            <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Follow Our Bake Daily:</div>
+            <div class="social-icons">
+              <a href="#" class="social-btn"><i class="fa-brands fa-instagram"></i></a>
+              <a href="#" class="social-btn"><i class="fa-brands fa-facebook"></i></a>
+              <a href="#" class="social-btn"><i class="fa-brands fa-tiktok"></i></a>
+              <a href="https://wa.me/923348984654" target="_blank" class="social-btn"><i class="fa-brands fa-whatsapp"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>© 2026 Freshco Bakers (Pvt) Ltd. All rights reserved. Baked fresh every single morning.</div>
+        <div class="footer-bottom-links">
+          <a href="#" onclick="switchTab('about')">Hygiene Standards</a>
+          <span>•</span>
+          <a href="#" onclick="switchTab('orders')">Track Order</a>
+          <span>•</span>
+          <a href="#" onclick="switchTab('stores')">Branch Locator</a>
+        </div>
+      </div>
+    </div>
+  </footer>
 
   <script src="app.js"></script>
 </body>

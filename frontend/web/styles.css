@@ -538,3 +538,568 @@ h1, h2, h3, h4, h5, h6 {
 .wishlist-heart { position: absolute; top: 10px; right: 10px; z-index: 5; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255,255,255,0.9); box-shadow: var(--shadow-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 15px; transition: all 0.15s; }
 .wishlist-heart:hover { transform: scale(1.1); }
 .wishlist-heart.active { color: var(--danger); }
+
+/* =========================================================
+   NEW BAKERY WEBSITE ENHANCEMENTS
+   ========================================================= */
+
+/* Top Announcement Strip */
+.top-announcement-strip {
+  background: linear-gradient(90deg, #2C1810, #4A2818, #2C1810);
+  color: #FDFBF7;
+  padding: 8px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(230,126,34,0.3);
+}
+.announcement-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+.announcement-divider {
+  color: var(--accent);
+  opacity: 0.6;
+}
+
+/* Brand Text in Header */
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+.brand-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--primary);
+  line-height: 1.1;
+}
+.brand-tagline {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Schedule Bar / Daily Bake Timings */
+.schedule-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 36px;
+  box-shadow: var(--shadow-sm);
+}
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.schedule-card {
+  background: linear-gradient(135deg, #FAF5EF, #FFF);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.schedule-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--accent);
+}
+.schedule-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(230,126,34,0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.schedule-time {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.schedule-item-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-main);
+}
+.schedule-item-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* USP 4-Card Grid */
+.usp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 20px;
+  margin-bottom: 36px;
+}
+.usp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.usp-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent);
+}
+.usp-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FAF5EF, #F3E5D8);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 14px;
+}
+.usp-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text-main);
+}
+.usp-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Category Filter Pills */
+.category-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.category-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+.category-pill:hover, .category-pill.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(139, 69, 19, 0.25);
+}
+
+/* Custom Cake Builder Interactive Styles */
+.cake-builder-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+}
+.cake-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.cake-step-indicator.active {
+  color: var(--primary);
+}
+.cake-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.cake-step-indicator.active .cake-step-num {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.cake-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.cake-select-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  background: var(--surface);
+  transition: all 0.2s ease;
+}
+.cake-select-card:hover {
+  border-color: var(--accent);
+}
+.cake-select-card.selected {
+  border-color: var(--primary);
+  background: #FAF5EF;
+  box-shadow: 0 4px 12px rgba(139, 69, 19, 0.15);
+}
+.cake-select-card i {
+  font-size: 28px;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+/* 5-Step Order Pipeline Timeline */
+.order-tracker-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 24px 0;
+  position: relative;
+}
+.pipeline-step {
+  text-align: center;
+  position: relative;
+}
+.pipeline-dot {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-light);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+.pipeline-step.completed .pipeline-dot {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.pipeline-step.active .pipeline-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(230, 126, 34, 0.6);
+  animation: pulseActive 1.8s infinite;
+}
+@keyframes pulseActive {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+.pipeline-step-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+.pipeline-step-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Branch / Store Locator Cards */
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 30px;
+}
+.store-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+.store-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent);
+}
+.store-card-header {
+  background: linear-gradient(135deg, #2C1810, #4A2818);
+  color: #fff;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.store-body {
+  padding: 20px;
+}
+.store-open-badge {
+  background: #27AE60;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.store-feature-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.store-tag {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* Floating WhatsApp Widget */
+.whatsapp-float-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+}
+.whatsapp-btn {
+  width: 60px;
+  height: 60px;
+  background: #25D366;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 32px;
+  text-decoration: none;
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+  transition: all 0.25s ease;
+  position: relative;
+}
+.whatsapp-btn:hover {
+  transform: scale(1.12);
+  box-shadow: 0 8px 25px rgba(37, 211, 102, 0.6);
+}
+.whatsapp-tooltip {
+  position: absolute;
+  right: 70px;
+  background: #2C1810;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: var(--shadow-md);
+}
+.whatsapp-btn:hover .whatsapp-tooltip {
+  opacity: 1;
+}
+
+/* Website Footer */
+.app-footer {
+  background: #1B0F0A;
+  color: #FAF5EF;
+  padding: 60px 24px 24px;
+  margin-top: auto;
+  border-top: 4px solid var(--accent);
+}
+.footer-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+@media (max-width: 992px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pipeline-steps {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.footer-col h4 {
+  color: #fff;
+  font-size: 16px;
+  margin-bottom: 18px;
+  position: relative;
+  padding-bottom: 8px;
+}
+.footer-col h4::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+}
+.footer-desc {
+  font-size: 13px;
+  color: #C2B6AE;
+  line-height: 1.6;
+  margin: 14px 0 16px;
+}
+.footer-links {
+  list-style: none;
+}
+.footer-links li {
+  margin-bottom: 10px;
+}
+.footer-links a {
+  color: #C2B6AE;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.15s ease;
+}
+.footer-links a:hover {
+  color: var(--accent);
+}
+.footer-info-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #C2B6AE;
+}
+.footer-info-item i {
+  color: var(--accent);
+  font-size: 16px;
+  margin-top: 2px;
+}
+.newsletter-form {
+  display: flex;
+  gap: 8px;
+}
+.newsletter-form input {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 13px;
+}
+.newsletter-form input::placeholder {
+  color: #999;
+}
+.social-icons {
+  display: flex;
+  gap: 10px;
+}
+.social-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.social-btn:hover {
+  background: var(--accent);
+  transform: translateY(-2px);
+}
+.halal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(39, 174, 96, 0.2);
+  color: #2ECC71;
+  border: 1px solid rgba(39, 174, 96, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #998C82;
+}
+.footer-bottom-links {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.footer-bottom-links a {
+  color: #C2B6AE;
+  text-decoration: none;
+}
+.footer-bottom-links a:hover {
+  color: var(--accent);
+}
