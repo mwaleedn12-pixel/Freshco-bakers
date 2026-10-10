@@ -35,10 +35,12 @@ uvicorn app.main:app --reload       # runs at http://localhost:8000
 ```
 
 Check it's alive:
-- http://localhost:8000/  → `{"message": "Freshco Bakers API is running"}`
-- http://localhost:8000/api/v1/health
+- http://localhost:8000/  → Interactive Developer Hub (or JSON for API clients)
+- http://localhost:8000/dashboard  → Visual Operations & Test Console
+- http://localhost:8000/scalar  → Modern Scalar API Reference
+- http://localhost:8000/docs  → Custom-themed Swagger UI
+- http://localhost:8000/api/v1/health  → Health probe
 - http://localhost:8000/api/v1/health/db  (needs Postgres running & DATABASE_URL correct)
-- http://localhost:8000/api/v1/docs  → Swagger UI
 
 Local PostgreSQL database matching `DATABASE_URL`:
 

@@ -33,6 +33,9 @@ EXEMPT_PATH_PREFIXES = (
     f"{settings.API_V1_PREFIX}/docs",
     f"{settings.API_V1_PREFIX}/openapi.json",
     f"{settings.API_V1_PREFIX}/health",
+    "/docs",
+    "/scalar",
+    "/dashboard",
     "/favicon",
 )
 
