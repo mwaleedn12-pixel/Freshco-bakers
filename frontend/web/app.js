@@ -14,7 +14,7 @@ let state = {
   products: [],                  // flat array (unwrapped from the paginated API response)
   categories: [],
   authMode: 'login',
-  staffRoles: ['cashier', 'manager', 'admin', 'owner'],
+  staffRoles: ['cashier', 'admin', 'owner'],
   wishlistIds: [],
 };
 let posCart = [];
@@ -75,8 +75,8 @@ async function apiFetch(path, options = {}) {
 
 function isLoggedIn() { return !!state.currentUser; }
 function isStaff() { return isLoggedIn() && state.staffRoles.indexOf(state.currentUser.role) !== -1; }
-function isCashier() { return isLoggedIn() && ['cashier', 'manager', 'admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
-function isAdminOrManager() { return isLoggedIn() && ['manager', 'admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
+function isCashier() { return isLoggedIn() && ['cashier', 'admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
+function isAdminOrOwner() { return isLoggedIn() && ['admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
 
 function requireLogin(msg) {
   if (!isLoggedIn()) { showToast(msg || 'Please sign in first.', 'error'); openAuthModal(); return false; }
@@ -105,12 +105,38 @@ function renderAccessDenied(viewName) {
 // -------------------------------------------------------------------- init
 document.addEventListener('DOMContentLoaded', () => { initApp(); });
 
+// Restore tab from URL hash so browser refresh keeps current tab
+function getHashTab() {
+  const hash = window.location.hash.replace('#', '');
+  const validCustomerTabs = ['home', 'catalog', 'cake', 'orders'];
+  const validAdminTabs = ['overview', 'products', 'orders-kanban', 'inventory', 'staff', 'settings'];
+  if (validCustomerTabs.indexOf(hash) !== -1) return { role: 'customer', tab: hash };
+  if (validAdminTabs.indexOf(hash) !== -1) return { role: 'admin', tab: hash };
+  if (hash === 'pos') return { role: 'pos', tab: 'pos' };
+  return null;
+}
+
+function setHashTab(role, tab) {
+  const hashTab = role === 'pos' ? 'pos' : tab;
+  history.replaceState(null, '', '#' + hashTab);
+}
+
 async function initApp() {
   if (state.token) {
     try { state.currentUser = await apiFetch('/auth/me'); }
     catch (e) { logout(false); }
   }
-  if (!isStaff()) {
+  // Restore tab from URL hash
+  const saved = getHashTab();
+  if (saved) {
+    if (saved.role !== 'customer' && !isStaff()) {
+      state.currentRole = 'customer';
+      state.currentTab = 'home';
+    } else {
+      state.currentRole = saved.role;
+      state.currentTab = saved.tab;
+    }
+  } else if (!isStaff()) {
     state.currentRole = 'customer';
     state.currentTab = 'home';
   }
@@ -268,6 +294,7 @@ function switchRole(role) {
   }
   state.currentRole = role;
   state.currentTab = role === 'customer' ? 'home' : (role === 'admin' ? 'overview' : 'pos');
+  setHashTab(state.currentRole, state.currentTab);
   renderApp();
 }
 
@@ -276,6 +303,7 @@ function switchTab(tab) {
   document.querySelectorAll('#customer-nav .nav-link').forEach(l => l.classList.remove('active'));
   const active = document.getElementById('nav-' + tab);
   if (active) active.classList.add('active');
+  setHashTab('customer', tab);
   renderApp();
 }
 
@@ -289,6 +317,7 @@ function switchAdminTab(tab) {
   document.querySelectorAll('#admin-nav .nav-link').forEach(l => l.classList.remove('active'));
   const active = document.getElementById('admin-nav-' + tab);
   if (active) active.classList.add('active');
+  setHashTab('admin', tab);
   renderApp();
 }
 
@@ -319,17 +348,14 @@ function renderApp() {
     if (state.currentTab === 'home') container.innerHTML = renderCustomerHome();
     else if (state.currentTab === 'catalog') container.innerHTML = renderCatalogView();
     else if (state.currentTab === 'cake') renderCustomCakeTab(container);
-    else if (state.currentTab === 'stores') renderStoresTab(container);
     else if (state.currentTab === 'orders') renderOrdersView(container);
-    else if (state.currentTab === 'reviews') renderReviewsTab(container);
-    else if (state.currentTab === 'about') renderAboutTab(container);
+    else container.innerHTML = renderCustomerHome(); // fallback
   } else if (state.currentRole === 'admin') {
     if (!isStaff()) { container.innerHTML = renderAccessDenied('Admin Dashboard'); return; }
     if (state.currentTab === 'overview') renderAdminDashboard(container);
     else if (state.currentTab === 'products') renderAdminProducts(container);
     else if (state.currentTab === 'orders-kanban') renderAdminKanban(container);
     else if (state.currentTab === 'inventory') renderAdminInventory(container);
-    else if (state.currentTab === 'cakes') renderAdminCakeQuotes(container);
     else if (state.currentTab === 'staff') renderAdminStaff(container);
     else if (state.currentTab === 'settings') renderAdminSettings(container);
   } else if (state.currentRole === 'pos') {
@@ -529,8 +555,6 @@ function renderCustomerHome() {
             '<i class="fa-solid fa-cookie-bite"></i> Order Fresh Menu</button>' +
           '<button class="btn-secondary" onclick="switchTab(\'cake\')" style="padding:14px 24px; font-size:15px; background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.3);">' +
             '<i class="fa-solid fa-cake-candles" style="color:var(--accent);"></i> Custom Cake Studio</button>' +
-          '<button class="btn-secondary" onclick="switchTab(\'stores\')" style="padding:14px 20px; font-size:15px; background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.3);">' +
-            '<i class="fa-solid fa-location-dot" style="color:#2ECC71;"></i> Nearest Branch</button>' +
         '</div>' +
       '</div>' +
       '<div style="text-align:center;">' +
@@ -618,31 +642,6 @@ function renderCustomerHome() {
       '</div>' +
       '<button class="btn-primary" onclick="switchTab(\'cake\')" style="padding:14px 28px; font-size:15px; font-weight:700;">' +
         '<i class="fa-solid fa-palette"></i> Open Cake Studio</button>' +
-    '</div>' +
-
-    '<!-- Testimonials Highlight -->' +
-    '<div style="margin-bottom:40px;">' +
-      '<div style="text-align:center; margin-bottom:24px;">' +
-        '<h2 style="font-size:24px; color:var(--text-main);">Loved By Over 25,000 Foodies</h2>' +
-        '<p style="color:var(--text-muted); font-size:14px;">Real reviews from our satisfied sweet &amp; savoury lovers across Pakistan</p>' +
-      '</div>' +
-      '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">' +
-        '<div class="section-card" style="margin-bottom:0;">' +
-          '<div style="color:var(--accent); margin-bottom:8px;">★★★★★</div>' +
-          '<p style="font-style:italic; font-size:14px; margin-bottom:12px; line-height:1.5;">"The Belgian Chocolate Fudge Cake was the star of my daughter\'s birthday! Warm, rich, and not overly sweet. Delivered right on time."</p>' +
-          '<div style="font-weight:700; font-size:13px; color:var(--primary);">&mdash; Sara Ahmed (Lahore)</div>' +
-        '</div>' +
-        '<div class="section-card" style="margin-bottom:0;">' +
-          '<div style="color:var(--accent); margin-bottom:8px;">★★★★★</div>' +
-          '<p style="font-style:italic; font-size:14px; margin-bottom:12px; line-height:1.5;">"Best sourdough bread in the city hands down. Crunchy blistered crust and the aroma filled our entire kitchen. Ordering weekly now!"</p>' +
-          '<div style="font-weight:700; font-size:13px; color:var(--primary);">&mdash; Bilal Qureshi (DHA Lahore)</div>' +
-        '</div>' +
-        '<div class="section-card" style="margin-bottom:0;">' +
-          '<div style="color:var(--accent); margin-bottom:8px;">★★★★★</div>' +
-          '<p style="font-style:italic; font-size:14px; margin-bottom:12px; line-height:1.5;">"Their custom cake quotation system was super fast. The finished wedding cake was exact replica of my Pinterest reference picture."</p>' +
-          '<div style="font-weight:700; font-size:13px; color:var(--primary);">&mdash; Fatima Tariq (Islamabad)</div>' +
-        '</div>' +
-      '</div>' +
     '</div>';
 }
 
@@ -826,8 +825,10 @@ function renderCartModal() {
       '<button class="icon-link-btn" onclick="cartRemove(' + i.product_id + ')"><i class="fa-solid fa-trash"></i></button>' +
     '</div>').join('');
 
-  const defaultPhone = (state.user && state.user.phone) ? state.user.phone : '03348984654';
-  const defaultName = (state.user && state.user.name) ? state.user.name : '';
+  const isReg = isLoggedIn();
+  const savedPhone = localStorage.getItem('freshco_saved_phone') || '';
+  const defaultPhone = (state.currentUser && state.currentUser.phone) ? state.currentUser.phone : (savedPhone || '');
+  const defaultName = isReg ? (state.currentUser.name || '') : '';
 
   body.innerHTML = rows +
     '<!-- Coupon Code Box -->' +
@@ -848,8 +849,9 @@ function renderCartModal() {
     '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px;">' +
       '<div style="font-weight:700; font-size:14px; margin-bottom:12px; color:var(--text-main);"><i class="fa-solid fa-truck" style="color:var(--accent); margin-right:6px;"></i> Delivery &amp; Contact Details</div>' +
       
-      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Customer Full Name</label>' +
-        '<input type="text" id="checkout-name" class="form-control" placeholder="e.g. Sara Ali" value="' + escapeHtml(defaultName) + '"></div>' +
+      // For guests we need a name; for registered users it's pre-filled & readonly
+      (!isReg ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Your Full Name</label>' +
+        '<input type="text" id="checkout-name" class="form-control" placeholder="e.g. Sara Ali" required></div>' : '') +
       
       '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">WhatsApp Mobile Number <span style="color:var(--primary); font-size:11px;">(For Live Updates)</span></label>' +
         '<input type="tel" id="checkout-phone" class="form-control" placeholder="e.g. 03348984654" value="' + escapeHtml(defaultPhone) + '" required></div>' +
@@ -869,11 +871,9 @@ function renderCartModal() {
           '</select></div>' +
       '</div>' +
 
-      '<div class="form-group" id="checkout-branch-group" style="display:none; margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Pickup Branch</label>' +
+      '<div class="form-group" id="checkout-branch-group" style="display:none; margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Pickup Location</label>' +
         '<select id="checkout-branch" class="form-select">' +
-          '<option value="Gulberg">Gulberg III Flagship (MM Alam Rd)</option>' +
-          '<option value="DHA">DHA Phase 5 (Commercial)</option>' +
-          '<option value="Islamabad">Islamabad (Blue Area)</option>' +
+          '<option value="Adyala">Ali Town Near Bank Alfalah, Adyala Road, Rawalpindi</option>' +
         '</select></div>' +
 
       '<div class="form-group" id="checkout-address-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Delivery Address</label>' +
@@ -901,10 +901,21 @@ function renderCartModal() {
 
 async function handleCheckout() {
   if (!state.cart.length) return;
-  if (!requireLogin('Please sign in to place an order.')) return;
 
   const orderType = document.getElementById('checkout-order-type').value;
-  const customerName = document.getElementById('checkout-name').value.trim();
+  // For guests, they enter a name; for registered users, use their account name
+  let customerName;
+  if (isLoggedIn()) {
+    customerName = state.currentUser.name;
+  } else {
+    const nameEl = document.getElementById('checkout-name');
+    customerName = nameEl ? nameEl.value.trim() : '';
+    if (!customerName) {
+      showToast('Please enter your full name to place an order.', 'error');
+      if (nameEl) nameEl.focus();
+      return;
+    }
+  }
   const customerPhone = document.getElementById('checkout-phone').value.trim();
   const slot = document.getElementById('checkout-slot').value;
   const notes = (document.getElementById('checkout-notes') ? document.getElementById('checkout-notes').value.trim() : '') + (slot ? ' [Time Slot: ' + slot + ']' : '');
@@ -920,31 +931,51 @@ async function handleCheckout() {
     if (orderType === 'DELIVERY') {
       const line1 = document.getElementById('checkout-address').value.trim();
       if (!line1) { showToast('Please enter a delivery address.', 'error'); return; }
-      const address = await apiFetch('/addresses', { method: 'POST', body: { line1: line1 } });
-      addressId = address.id;
+      if (isLoggedIn()) {
+        const address = await apiFetch('/addresses', { method: 'POST', body: { line1: line1 } });
+        addressId = address.id;
+      }
     }
 
-    await apiFetch('/cart/items', { method: 'DELETE' }).catch(() => {});
-    for (const item of state.cart) {
-      await apiFetch('/cart/items', { method: 'POST', body: { product_id: item.product_id, quantity: item.quantity } });
-    }
-    const order = await apiFetch('/orders', {
-      method: 'POST',
-      body: {
-        order_type: orderType,
-        address_id: addressId,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        notes: notes
+    let order;
+    if (isLoggedIn()) {
+      await apiFetch('/cart/items', { method: 'DELETE' }).catch(() => {});
+      for (const item of state.cart) {
+        await apiFetch('/cart/items', { method: 'POST', body: { product_id: item.product_id, quantity: item.quantity } });
       }
-    });
+      order = await apiFetch('/orders', {
+        method: 'POST',
+        body: {
+          order_type: orderType,
+          address_id: addressId,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          notes: notes
+        }
+      });
+      // Save phone for future auto-fill
+      localStorage.setItem('freshco_saved_phone', customerPhone);
+    } else {
+      // Guest order - use guest endpoint
+      order = await apiFetch('/orders/guest', {
+        method: 'POST',
+        auth: false,
+        body: {
+          order_type: orderType,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          notes: notes,
+          items: state.cart.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
+        }
+      });
+    }
 
     state.cart = [];
     appliedCouponDiscount = 0;
     appliedCouponCode = '';
     updateCartBadge();
     document.getElementById('cart-modal').classList.remove('active');
-    showToast('Order #' + order.order_number + ' confirmed! WhatsApp notification sent to ' + customerPhone, 'success');
+    showToast('Order #' + (order.order_number || order.id) + ' confirmed! WhatsApp notification sent to ' + customerPhone, 'success');
     switchTab('orders');
   } catch (e) {
     showToast(e.message, 'error');
@@ -1494,7 +1525,9 @@ async function refreshAdminProducts() {
           '<td><span class="status-badge status-' + (p.status === 'active' ? 'DELIVERED' : 'CANCELLED') + '">' + p.status + '</span></td>' +
           '<td style="display:flex; gap:8px;">' +
             '<button class="btn-secondary btn-sm" onclick="openProductModalById(' + p.id + ')">Edit</button>' +
-            (p.status === 'active' ? '<button class="btn-danger-sm" onclick="archiveProduct(' + p.id + ')">Archive</button>' : '') +
+            (p.status === 'active'
+              ? '<button class="btn-danger-sm" onclick="archiveProduct(' + p.id + ')">Archive</button>'
+              : '<button class="btn-secondary btn-sm" onclick="unarchiveProduct(' + p.id + ')"><i class="fa-solid fa-box-open"></i> Unarchive</button>') +
           '</td></tr>').join('') +
       '</tbody></table>';
   } catch (e) {
@@ -1555,7 +1588,14 @@ async function archiveProduct(id) {
   catch (e) { showToast(e.message, 'error'); }
 }
 
+async function unarchiveProduct(id) {
+  if (!confirm('Unarchive this product? It will become visible in the public catalog again.')) return;
+  try { await apiFetch('/products/' + id + '/unarchive', { method: 'PATCH' }); showToast('Product unarchived and now active.', 'success'); await loadCatalogData(); refreshAdminProducts(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
 // --- Admin: orders kanban
+// DONE column is last so it renders on the right side of the board
 const KANBAN_COLUMNS = [
   { status: 'PENDING', label: 'Pending', next: 'CONFIRMED' },
   { status: 'CONFIRMED', label: 'Confirmed', next: 'PREPARING' },
@@ -1571,7 +1611,8 @@ async function renderAdminKanban(container) {
   }
   container.innerHTML = '<div style="margin-bottom:24px;"><h2>Kitchen Orders Kanban Board</h2>' +
     '<p style="color:var(--text-muted);">Live order status workflow &amp; fulfillment tracking</p></div>' +
-    '<div id="kanban-board"><p style="color:var(--text-muted);">Loading...</p></div>';
+    '<div id="kanban-board"><p style="color:var(--text-muted);">Loading...</p></div>' +
+    '<style>#kanban-board .kanban-board { display:flex; flex-direction:row; gap:16px; overflow-x:auto; align-items:flex-start; } #kanban-board .kanban-col { min-width:200px; flex:1; }</style>';
   await refreshKanban();
 }
 
@@ -1726,13 +1767,13 @@ async function renderAdminStaff(container) {
     return;
   }
   container.innerHTML = '' +
-    '<div style="margin-bottom:24px;"><h2>Staff &amp; Employee Permissions</h2><p style="color:var(--text-muted);">Manage Cashier, Manager and Admin accounts</p></div>' +
+    '<div style="margin-bottom:24px;"><h2>Staff &amp; Employee Permissions</h2><p style="color:var(--text-muted);">Manage Cashier and Admin accounts</p></div>' +
     '<div class="section-card"><h3 style="margin-bottom:12px;">Add Staff Member</h3>' +
       '<form onsubmit="handleAddStaff(event)" style="display:grid; grid-template-columns:1.5fr 1.5fr 1.5fr 1fr auto; gap:10px; align-items:end;">' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Name</label><input id="staff-name" class="form-control" required></div>' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Email</label><input id="staff-email" type="email" class="form-control" required></div>' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Password</label><input id="staff-password" type="password" class="form-control" required minlength="8"></div>' +
-        '<div class="form-group" style="margin:0;"><label class="form-label">Role</label><select id="staff-role" class="form-select"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>' +
+        '<div class="form-group" style="margin:0;"><label class="form-label">Role</label><select id="staff-role" class="form-select"><option value="cashier">Cashier</option><option value="admin">Admin</option></select></div>' +
         '<button class="btn-primary" type="submit">Add</button>' +
       '</form></div>' +
     '<div id="staff-table"><p style="color:var(--text-muted);">Loading...</p></div>';
