@@ -70,7 +70,7 @@ class _Tilt3DCardState extends State<Tilt3DCard> {
                 borderRadius: BorderRadius.circular(widget.borderRadius),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(_hovering ? 0.28 : 0.14),
+                    color: Colors.black.withValues(alpha: _hovering ? 0.28 : 0.14),
                     blurRadius: _hovering ? 26 : 12,
                     offset: Offset(_rotateY * 40, -_rotateX * 40 + 8),
                   ),

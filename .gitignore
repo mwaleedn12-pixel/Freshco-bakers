@@ -25,3 +25,9 @@ frontend/pubspec.lock
 # --- Deployment ---
 nginx/certs/*.pem
 nginx/certs/*.key
+
+# --- Neon & Tooling ---
+.neon
+node_modules/
+.env.local
+.widget_preview/

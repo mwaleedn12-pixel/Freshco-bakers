@@ -3,6 +3,7 @@ Central application configuration.
 All values are loaded from environment variables (.env) — never hardcode secrets.
 """
 from functools import lru_cache
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,9 +21,22 @@ class Settings(BaseSettings):
 
     # Database (single central PostgreSQL DB — website + POS share it)
     DATABASE_URL: str = "postgresql+psycopg://freshco_user:freshco_pass@localhost:5432/freshco_bakers_db"
+    DATABASE_URL_UNPOOLED: str | None = None
+    NEON_BRANCH: str | None = None
 
-    # CORS — restrict to trusted origins in production
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8080"]
+    @field_validator("DATABASE_URL", "DATABASE_URL_UNPOOLED", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: str | None) -> str | None:
+        if not v:
+            return v
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://"):]
+        if v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            v = "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
+
+    # CORS — restrict to trusted origins in production (default allow all in dev)
+    CORS_ORIGINS: list[str] = ["*"]
 
     # Redis (optional, for caching / offline queue later)
     REDIS_URL: str | None = None
@@ -44,7 +58,11 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_SECRET: str = "freshco-n8n-secret-key-2026"
     N8N_TIMEOUT_SECONDS: float = 3.0
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local", "../.env.local", "../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 

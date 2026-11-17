@@ -90,9 +90,9 @@ class _HeroBanner extends StatelessWidget {
                 color: AppTheme.brandAmber,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Icon(Icons.storefront, color: AppTheme.brandBrown),
                   SizedBox(width: 10),
                   Text(
@@ -146,7 +146,7 @@ class _ProductCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: AppTheme.brandAmber.withOpacity(0.2),
+                color: AppTheme.brandAmber.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(item.icon, color: AppTheme.brandBrown, size: 28),

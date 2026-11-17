@@ -2,7 +2,9 @@
    Every screen in this file calls the real FastAPI backend at API_BASE.
    No hard-coded / fake data is shown once the backend responds. */
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = (typeof window !== 'undefined' && window.location.origin && window.location.port === '8000')
+  ? `${window.location.origin}/api/v1`
+  : 'http://localhost:8000/api/v1';
 
 // ----------------------------------------------------------------- state
 let state = {

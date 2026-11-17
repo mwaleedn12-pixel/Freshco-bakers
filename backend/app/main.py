@@ -1,10 +1,12 @@
 import logging
+import os
 import sys
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -92,14 +94,25 @@ app.add_middleware(RequestIdMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
+cors_origins = list(settings.CORS_ORIGINS)
+if settings.ENVIRONMENT != "production":
+    if "*" not in cors_origins and "null" not in cors_origins:
+        cors_origins.extend(["null", "http://localhost", "http://127.0.0.1"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$" if settings.ENVIRONMENT != "production" else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Request-Id", "X-RateLimit-Limit"],
 )
+
+# Mount web frontend static files if present (provides direct /store access)
+frontend_web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "web"))
+if os.path.isdir(frontend_web_dir):
+    app.mount("/store", StaticFiles(directory=frontend_web_dir, html=True), name="store")
 
 # Trusted-host is Starlette-native (wraps the ASGI app)
 if settings.ENVIRONMENT == "production":

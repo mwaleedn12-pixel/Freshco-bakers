@@ -32,7 +32,7 @@ class AppTheme {
         ),
         cardTheme: CardThemeData(
           elevation: 6,
-          shadowColor: brandBrown.withOpacity(0.35),
+          shadowColor: brandBrown.withValues(alpha: 0.35),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       );
