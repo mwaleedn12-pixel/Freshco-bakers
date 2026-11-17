@@ -15,7 +15,15 @@ def get_role_by_name(db: Session, name: str) -> Role | None:
 
 
 def list_staff(db: Session, role: str | None = None) -> list[User]:
-    stmt = select(User).join(User.role).where(Role.name.in_(["cashier", "manager", "admin", "owner"]))
+    stmt = (
+        select(User)
+        .join(User.role)
+        .where(
+            Role.name.in_(["cashier", "manager", "admin", "owner"]),
+            User.email != "manager@freshco.com",
+            User.name != "Zain Manager",
+        )
+    )
     if role:
         stmt = stmt.where(Role.name == role)
     return list(db.scalars(stmt.order_by(User.id.desc())).all())
@@ -106,3 +114,23 @@ def update_staff(
     db.commit()
     db.refresh(staff_user)
     return staff_user
+
+
+def delete_staff(db: Session, actor: User, staff_id: int) -> None:
+    """Permanently removes a staff member from the system."""
+    from app.services.errors import ServiceError  # local import to avoid circular
+    staff_user = db.get(User, staff_id)
+    if not staff_user or not staff_user.role or staff_user.role.name not in ["cashier", "manager", "admin", "owner"]:
+        raise ServiceError("Staff user not found.", 404)
+    if actor and actor.id == staff_id:
+        raise ServiceError("You cannot delete your own account.", 400)
+    log_action(
+        db,
+        user_id=actor.id if actor else None,
+        action="staff.delete",
+        entity_type="user",
+        entity_id=staff_user.id,
+        old_data={"name": staff_user.name, "email": staff_user.email},
+    )
+    db.delete(staff_user)
+    db.commit()

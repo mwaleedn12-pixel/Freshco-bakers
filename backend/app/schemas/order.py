@@ -18,6 +18,24 @@ class CheckoutRequest(BaseModel):
     customer_phone: str | None = Field(default=None, max_length=30)
 
 
+class GuestOrderItem(BaseModel):
+    product_id: int
+    quantity: int = Field(default=1, gt=0)
+
+
+class GuestCheckoutRequest(BaseModel):
+    order_type: OrderType = OrderType.PICKUP
+    customer_name: str = Field(min_length=1, max_length=150)
+    customer_phone: str = Field(min_length=5, max_length=30)
+    delivery_address: str | None = None
+    branch_id: int | None = None
+    scheduled_at: datetime | None = None
+    notes: str | None = Field(default=None, max_length=500)
+    coupon_code: str | None = Field(default=None, max_length=50)
+    payment_method: Literal["CASH", "ONLINE"] = "CASH"
+    items: list[GuestOrderItem] = Field(min_length=1)
+
+
 class OrderItemOut(BaseModel):
     id: int
     product_id: int | None = None
@@ -65,6 +83,7 @@ class OrderOut(BaseModel):
     scheduled_at: str | None = None
     notes: str | None = None
     created_at: datetime
+    whatsapp_url: str | None = None
     items: list[OrderItemOut] = []
     payments: list[PaymentOut] = []
 

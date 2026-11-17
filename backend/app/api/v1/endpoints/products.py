@@ -73,6 +73,11 @@ def archive_product(product_id: int, db: Session = Depends(get_db), user: User =
     catalog_service.archive_product(db, user=user, product_id=product_id)
 
 
+@router.patch("/{product_id}/unarchive", response_model=ProductAdminOut)
+def unarchive_product(product_id: int, db: Session = Depends(get_db), user: User = Depends(admin_only)):
+    return catalog_service.unarchive_product(db, user=user, product_id=product_id)
+
+
 @router.post("/{product_id}/images", response_model=ProductAdminOut, status_code=status.HTTP_201_CREATED)
 def add_image(product_id: int, payload: ProductImageCreate, db: Session = Depends(get_db),
               user: User = Depends(admin_only)):
@@ -83,3 +88,9 @@ def add_image(product_id: int, payload: ProductImageCreate, db: Session = Depend
 def remove_image(product_id: int, image_id: int, db: Session = Depends(get_db),
                  user: User = Depends(admin_only)):
     return catalog_service.remove_image(db, user=user, product_id=product_id, image_id=image_id)
+
+
+@router.delete("/{product_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_permanently(product_id: int, db: Session = Depends(get_db), user: User = Depends(admin_only)):
+    """Permanently remove a product and all its images from the database."""
+    catalog_service.delete_product_permanently(db, user=user, product_id=product_id)

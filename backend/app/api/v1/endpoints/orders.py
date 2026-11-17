@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models.order import OrderSource, OrderStatus, OrderType, PaymentStatus
 from app.models.user import User
 from app.schemas.order import (
-    CheckoutRequest, OrderAdminDetailOut, OrderAdminOut, OrderAdminPage, OrderDetailOut, OrderOut, OrderPage,
+    CheckoutRequest, GuestCheckoutRequest, OrderAdminDetailOut, OrderAdminOut, OrderAdminPage, OrderDetailOut, OrderOut, OrderPage,
     PaymentUpdate, StatusChange,
 )
 from app.services import order_admin_service, order_service
@@ -39,6 +39,18 @@ def _admin_detail(db: Session, order_id: int) -> OrderAdminDetailOut:
 def checkout(payload: CheckoutRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Turns the current cart into an order (prices, coupon, tax, delivery fee and stock are decided here)."""
     return order_service.checkout(db, user, payload)
+
+
+@router.post("/guest", response_model=OrderDetailOut, status_code=status.HTTP_201_CREATED)
+def guest_checkout(payload: GuestCheckoutRequest, db: Session = Depends(get_db)):
+    """Allows guest (unregistered) customers to place an order by providing their name and phone."""
+    return order_service.guest_checkout(db, payload)
+
+
+@router.get("/guest/track", response_model=OrderDetailOut)
+def track_guest_order(order_number: str, db: Session = Depends(get_db)):
+    """Public endpoint — lets guest customers track their order by order number without signing in."""
+    return order_service.get_order_by_number(db, order_number)
 
 
 @router.get("", response_model=OrderPage)

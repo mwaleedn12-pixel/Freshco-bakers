@@ -91,8 +91,15 @@ def test_product_crud_visibility_and_audit(client, auth_headers, session_factory
     assert admin_list["total"] == 2
     assert client.get(f"{API}/products/admin/list", headers=customer).status_code == 403
 
+    # unarchive = restored and visible publicly again
+    unarchived = client.patch(f"{API}/products/{product['id']}/unarchive", headers=admin)
+    assert unarchived.status_code == 200
+    assert unarchived.json()["status"] == "active"
+    assert client.get(f"{API}/products/{product['id']}").status_code == 200
+    assert client.get(f"{API}/products").json()["total"] == 2
+
     # every admin change was audited
     with session_factory() as db:
         actions = {a.action for a in db.query(AuditLog).all()}
     assert {"category.create", "product.create", "product.update", "product.archive",
-            "product.image_add", "product.image_remove"} <= actions
+            "product.unarchive", "product.image_add", "product.image_remove"} <= actions
