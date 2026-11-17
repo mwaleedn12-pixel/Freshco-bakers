@@ -145,3 +145,21 @@ def test_unavailable_product_blocks_checkout(client, auth_headers):
     client.put(f"{API}/products/{pid}", json={"is_available": False}, headers=admin)
     r = client.post(f"{API}/orders", json={}, headers=cust)
     assert r.status_code == 400 and "no longer available" in r.json()["detail"]
+
+
+def test_guest_checkout(client, auth_headers):
+    admin = auth_headers("admin", "admin@fb.com")
+    pid = _make_product(client, admin, price=450)
+    payload = {
+        "order_type": "DELIVERY",
+        "customer_name": "Ahmad Guest",
+        "customer_phone": "03331234567",
+        "delivery_address": "House 55, Street 10, Rawalpindi",
+        "items": [{"product_id": pid, "quantity": 2}],
+    }
+    r = client.post(f"{API}/orders/guest", json=payload)
+    assert r.status_code == 201
+    data = r.json()
+    assert data["order_number"].startswith("FB-")
+    assert len(data["items"]) == 1
+    assert data["items"][0]["quantity"] == 2

@@ -53,8 +53,7 @@ def seed_data():
             return u
 
         owner = get_or_create_user("Waleed Owner", "owner@freshco.com", "owner", "+923000000001")
-        get_or_create_user("Admin User", "admin@freshco.com", "admin", "+923000000002")
-        manager = get_or_create_user("Zain Manager", "manager@freshco.com", "manager", "+923000000003")
+        admin = get_or_create_user("Admin User", "admin@freshco.com", "admin", "+923000000002")
         get_or_create_user("Ali Cashier", "cashier@freshco.com", "cashier", "+923000000004")
         cust1 = get_or_create_user("Sara Ahmed", "sara@gmail.com", "customer", "+923111111111")
         cust2 = get_or_create_user("Hamza Khan", "hamza@gmail.com", "customer", "+923222222222")
@@ -331,7 +330,7 @@ def seed_data():
                     description="September Electricity & Gas Bill",
                     amount=45000.0,
                     expense_date="2026-10-01",
-                    created_by=manager.id,
+                    created_by=admin.id,
                 )
             )
             db.add(
@@ -341,7 +340,7 @@ def seed_data():
                     description="Flour, Butter & Chocolate Supply",
                     amount=85000.0,
                     expense_date="2026-10-02",
-                    created_by=manager.id,
+                    created_by=admin.id,
                 )
             )
 
@@ -350,7 +349,6 @@ def seed_data():
         print("\n[KEYS] Login Credentials Created:")
         print("   Owner:    owner@freshco.com   / password123")
         print("   Admin:    admin@freshco.com   / password123")
-        print("   Manager:  manager@freshco.com / password123")
         print("   Cashier:  cashier@freshco.com / password123")
         print("   Customer: sara@gmail.com      / password123")
 

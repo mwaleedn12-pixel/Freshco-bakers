@@ -193,6 +193,19 @@ def archive_product(db: Session, *, user: User, product_id: int) -> None:
     db.commit()
 
 
+def unarchive_product(db: Session, *, user: User, product_id: int) -> Product:
+    """Restores an archived product back to active status and available in catalog."""
+    product = get_product(db, product_id, include_inactive=True)
+    old = snapshot(product)
+    product.status = "active"
+    product.is_available = True
+    log_action(db, user_id=user.id, action="product.unarchive", entity_type="Product",
+               entity_id=product.id, old_data=old, new_data=snapshot(product))
+    db.commit()
+    db.expire_all()
+    return get_product(db, product.id, include_inactive=True)
+
+
 def add_image(db: Session, *, user: User, product_id: int, data: dict) -> Product:
     product = get_product(db, product_id, include_inactive=True)
     make_primary = data["is_primary"] or len(product.images) == 0
@@ -225,3 +238,15 @@ def remove_image(db: Session, *, user: User, product_id: int, image_id: int) -> 
     db.commit()
     db.expire_all()
     return get_product(db, product.id, include_inactive=True)
+
+
+def delete_product_permanently(db: Session, *, user: User, product_id: int) -> None:
+    """Permanently deletes a product and all its images from the database.
+    Use with caution — this is irreversible and will break order history name references."""
+    product = get_product(db, product_id, include_inactive=True)
+    # Delete all images first
+    db.query(ProductImage).filter(ProductImage.product_id == product_id).delete()
+    log_action(db, user_id=user.id, action="product.delete_permanent", entity_type="Product",
+               entity_id=product_id, old_data={"name": product.name, "sku": product.sku})
+    db.delete(product)
+    db.commit()

@@ -91,3 +91,16 @@ def update_staff(
         role=updated.role.name if updated.role else "staff",
         status=updated.status,
     )
+
+
+@router.delete("/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_staff(
+    staff_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "owner")),
+) -> None:
+    """Permanently remove a staff member from the system."""
+    try:
+        staff_service.delete_staff(db, actor=actor, staff_id=staff_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

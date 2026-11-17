@@ -105,30 +105,78 @@ function renderAccessDenied(viewName) {
 }
 
 // -------------------------------------------------------------------- init
-document.addEventListener('DOMContentLoaded', () => { initApp(); });
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { initApp(); });
+} else {
+  initApp();
+}
 
-// Restore tab from URL hash so browser refresh keeps current tab
+window.addEventListener('hashchange', () => {
+  const saved = getHashTab();
+  if (saved) {
+    if (saved.role === 'customer' && saved.tab !== state.currentTab) {
+      switchTab(saved.tab);
+    } else if (saved.role === 'admin' && saved.tab !== state.currentTab && isStaff()) {
+      switchAdminTab(saved.tab);
+    } else if (saved.role === 'pos' && state.currentRole !== 'pos' && isStaff()) {
+      switchRole('pos');
+    }
+  }
+});
+
+// Restore tab from URL hash and localStorage so browser refresh keeps current tab
 function getHashTab() {
-  const hash = window.location.hash.replace('#', '');
+  const hash = (window.location.hash || '').replace('#', '').trim();
   const validCustomerTabs = ['home', 'catalog', 'cake', 'orders'];
   const validAdminTabs = ['overview', 'products', 'orders-kanban', 'inventory', 'staff', 'settings'];
   if (validCustomerTabs.indexOf(hash) !== -1) return { role: 'customer', tab: hash };
   if (validAdminTabs.indexOf(hash) !== -1) return { role: 'admin', tab: hash };
   if (hash === 'pos') return { role: 'pos', tab: 'pos' };
+
+  // Fallback to localStorage if no hash is present in URL
+  const storedRole = localStorage.getItem('freshco_active_role');
+  const storedTab = localStorage.getItem('freshco_active_tab');
+  if (storedRole && storedTab) {
+    if (storedRole === 'customer' && validCustomerTabs.indexOf(storedTab) !== -1) {
+      return { role: 'customer', tab: storedTab };
+    }
+    if (storedRole === 'admin' && validAdminTabs.indexOf(storedTab) !== -1) {
+      return { role: 'admin', tab: storedTab };
+    }
+    if (storedRole === 'pos') return { role: 'pos', tab: 'pos' };
+  }
   return null;
 }
 
 function setHashTab(role, tab) {
   const hashTab = role === 'pos' ? 'pos' : tab;
-  history.replaceState(null, '', '#' + hashTab);
+  try {
+    localStorage.setItem('freshco_active_role', role);
+    localStorage.setItem('freshco_active_tab', tab);
+  } catch (e) {}
+  if (window.location.hash !== '#' + hashTab) {
+    history.replaceState(null, '', '#' + hashTab);
+  }
 }
 
 async function initApp() {
   if (state.token) {
-    try { state.currentUser = await apiFetch('/auth/me'); }
-    catch (e) { logout(false); }
+    try {
+      state.currentUser = await apiFetch('/auth/me');
+      if (state.currentUser && state.currentUser.phone) {
+        localStorage.setItem('freshco_saved_phone', state.currentUser.phone);
+      }
+      try {
+        const addresses = await apiFetch('/addresses');
+        if (addresses && addresses.length) {
+          localStorage.setItem('freshco_saved_address', addresses[addresses.length - 1].line1);
+        }
+      } catch (e) {}
+    } catch (e) {
+      logout(false);
+    }
   }
-  // Restore tab from URL hash
+  // Restore tab from URL hash / localStorage
   const saved = getHashTab();
   if (saved) {
     if (saved.role !== 'customer' && !isStaff()) {
@@ -142,6 +190,7 @@ async function initApp() {
     state.currentRole = 'customer';
     state.currentTab = 'home';
   }
+  setHashTab(state.currentRole, state.currentTab);
   await loadCatalogData();
   await refreshWishlistIds();
   renderApp();
@@ -301,6 +350,7 @@ function switchRole(role) {
 }
 
 function switchTab(tab) {
+  state.currentRole = 'customer';
   state.currentTab = tab;
   document.querySelectorAll('#customer-nav .nav-link').forEach(l => l.classList.remove('active'));
   const active = document.getElementById('nav-' + tab);
@@ -342,8 +392,18 @@ function renderApp() {
   const adminNav = document.getElementById('admin-nav');
   const cartBtn = document.getElementById('cart-btn');
 
-  if (customerNav) customerNav.style.display = state.currentRole === 'customer' ? 'block' : 'none';
-  if (adminNav) adminNav.style.display = (state.currentRole === 'admin' && isStaff()) ? 'block' : 'none';
+  if (customerNav) {
+    customerNav.style.display = state.currentRole === 'customer' ? 'block' : 'none';
+    customerNav.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const activeCustomerNav = document.getElementById('nav-' + state.currentTab);
+    if (activeCustomerNav) activeCustomerNav.classList.add('active');
+  }
+  if (adminNav) {
+    adminNav.style.display = (state.currentRole === 'admin' && isStaff()) ? 'block' : 'none';
+    adminNav.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const activeAdminNav = document.getElementById('admin-nav-' + state.currentTab);
+    if (activeAdminNav) activeAdminNav.classList.add('active');
+  }
   if (cartBtn) cartBtn.style.display = state.currentRole === 'customer' ? 'flex' : 'none';
 
   if (state.currentRole === 'customer') {
@@ -594,42 +654,13 @@ function renderCustomerHome() {
       '</div>' +
     '</div>' +
 
-    '<!-- Daily Bake Timings Schedule Bar -->' +
-    '<div class="schedule-container">' +
-      '<div class="schedule-header">' +
-        '<div>' +
-          '<h3 style="font-size:18px; color:var(--text-main);"><i class="fa-solid fa-stopwatch" style="color:var(--accent);"></i> Daily Fresh Oven Schedule</h3>' +
-          '<p style="font-size:13px; color:var(--text-muted);">Catch your favourite warm bakery items straight as they exit the stone-deck oven</p>' +
-        '</div>' +
-        '<span class="store-open-badge"><i class="fa-solid fa-circle-dot"></i> Live Kitchen Active</span>' +
-      '</div>' +
-      '<div class="schedule-grid">' +
-        '<div class="schedule-card">' +
-          '<div class="schedule-icon"><i class="fa-solid fa-bread-slice"></i></div>' +
-          '<div><div class="schedule-time">07:00 AM &amp; 04:00 PM</div><div class="schedule-item-name">Artisan Sourdough &amp; Brioche</div><div class="schedule-item-desc">Crusty exterior, soft aerated crumb</div></div>' +
-        '</div>' +
-        '<div class="schedule-card">' +
-          '<div class="schedule-icon"><i class="fa-solid fa-cookie"></i></div>' +
-          '<div><div class="schedule-time">09:00 AM &amp; 05:00 PM</div><div class="schedule-item-name">French Butter Croissants</div><div class="schedule-item-desc">72 flaky layers of honeycomb goodness</div></div>' +
-        '</div>' +
-        '<div class="schedule-card">' +
-          '<div class="schedule-icon"><i class="fa-solid fa-pizza-slice"></i></div>' +
-          '<div><div class="schedule-time">12:30 PM (Lunch Hot)</div><div class="schedule-item-name">Puff Pastries &amp; Savoury Pies</div><div class="schedule-item-desc">Chicken quiches, beef rolls &amp; patties</div></div>' +
-        '</div>' +
-        '<div class="schedule-card">' +
-          '<div class="schedule-icon"><i class="fa-solid fa-cake-candles"></i></div>' +
-          '<div><div class="schedule-time">02:00 PM onwards</div><div class="schedule-item-name">Fresh Pastries &amp; Gateaux</div><div class="schedule-item-desc">Belgian fudge, Lotus &amp; red velvet</div></div>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-
     '<!-- Featured Products Section -->' +
     '<div style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">' +
       '<div>' +
-        '<h2 style="font-size:24px; color:var(--text-main);">Today\'s Masterpieces</h2>' +
+        '<h2 style="font-size:24px; color:var(--text-main);">Best-Selling</h2>' +
         '<p style="color:var(--text-muted); font-size:14px;">Hand-selected items from today’s fresh batch</p>' +
       '</div>' +
-      '<a href="#" onclick="switchTab(\'catalog\')" style="color:var(--primary); font-weight:700; text-decoration:none; font-size:15px;">Explore All Items (' + state.products.length + ') &rarr;</a>' +
+      '<a href="javascript:void(0)" onclick="switchTab(\'catalog\')" style="color:var(--primary); font-weight:700; text-decoration:none; font-size:15px;">Explore All Items (' + state.products.length + ') &rarr;</a>' +
     '</div>' +
     (toShow.length
       ? '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:24px; margin-bottom:40px;">' + toShow.map(productCard).join('') + '</div>'
@@ -829,8 +860,10 @@ function renderCartModal() {
 
   const isReg = isLoggedIn();
   const savedPhone = localStorage.getItem('freshco_saved_phone') || '';
+  const savedName = localStorage.getItem('freshco_saved_name') || '';
   const defaultPhone = (state.currentUser && state.currentUser.phone) ? state.currentUser.phone : (savedPhone || '');
-  const defaultName = isReg ? (state.currentUser.name || '') : '';
+  const defaultName = isReg ? (state.currentUser.name || '') : (savedName || '');
+  const defaultAddress = localStorage.getItem('freshco_saved_address') || '';
 
   body.innerHTML = rows +
     '<!-- Coupon Code Box -->' +
@@ -851,9 +884,11 @@ function renderCartModal() {
     '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px;">' +
       '<div style="font-weight:700; font-size:14px; margin-bottom:12px; color:var(--text-main);"><i class="fa-solid fa-truck" style="color:var(--accent); margin-right:6px;"></i> Delivery &amp; Contact Details</div>' +
       
-      // For guests we need a name; for registered users it's pre-filled & readonly
-      (!isReg ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Your Full Name</label>' +
-        '<input type="text" id="checkout-name" class="form-control" placeholder="e.g. Sara Ali" required></div>' : '') +
+      // For guests we need a name; for registered users it's pre-filled from account
+      (!isReg ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Your Full Name <span style="color:var(--danger);">*</span></label>' +
+        '<input type="text" id="checkout-name" class="form-control" placeholder="e.g. Sara Ali" value="' + escapeHtml(defaultName) + '" required></div>' :
+        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Customer Name</label>' +
+        '<input type="text" id="checkout-name" class="form-control" value="' + escapeHtml(defaultName) + '" readonly style="background:var(--bg-light); cursor:not-allowed;"></div>') +
       
       '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">WhatsApp Mobile Number <span style="color:var(--primary); font-size:11px;">(For Live Updates)</span></label>' +
         '<input type="tel" id="checkout-phone" class="form-control" placeholder="e.g. 03348984654" value="' + escapeHtml(defaultPhone) + '" required></div>' +
@@ -879,7 +914,7 @@ function renderCartModal() {
         '</select></div>' +
 
       '<div class="form-group" id="checkout-address-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Delivery Address</label>' +
-        '<input type="text" id="checkout-address" class="form-control" placeholder="House #, Street, Block, Area, City"></div>' +
+        '<input type="text" id="checkout-address" class="form-control" placeholder="House #, Street, Block, Area, City" value="' + escapeHtml(defaultAddress) + '"></div>' +
 
       '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Payment Method</label>' +
         '<select id="checkout-payment-method" class="form-select">' +
@@ -905,10 +940,9 @@ async function handleCheckout() {
   if (!state.cart.length) return;
 
   const orderType = document.getElementById('checkout-order-type').value;
-  // For guests, they enter a name; for registered users, use their account name
   let customerName;
   if (isLoggedIn()) {
-    customerName = state.currentUser.name;
+    customerName = (state.currentUser && state.currentUser.name) || '';
   } else {
     const nameEl = document.getElementById('checkout-name');
     customerName = nameEl ? nameEl.value.trim() : '';
@@ -930,12 +964,16 @@ async function handleCheckout() {
   }
 
   try {
+    let line1 = '';
     if (orderType === 'DELIVERY') {
-      const line1 = document.getElementById('checkout-address').value.trim();
-      if (!line1) { showToast('Please enter a delivery address.', 'error'); return; }
+      const addrEl = document.getElementById('checkout-address');
+      line1 = addrEl ? addrEl.value.trim() : '';
+      if (!line1) { showToast('Please enter a delivery address.', 'error'); if (addrEl) addrEl.focus(); return; }
       if (isLoggedIn()) {
-        const address = await apiFetch('/addresses', { method: 'POST', body: { line1: line1 } });
-        addressId = address.id;
+        try {
+          const address = await apiFetch('/addresses', { method: 'POST', body: { line1: line1 } });
+          addressId = address.id;
+        } catch (e) {}
       }
     }
 
@@ -955,8 +993,11 @@ async function handleCheckout() {
           notes: notes
         }
       });
-      // Save phone for future auto-fill
+      // Save customer details for registered customers after their first order
       localStorage.setItem('freshco_saved_phone', customerPhone);
+      if (line1) localStorage.setItem('freshco_saved_address', line1);
+      if (customerName) localStorage.setItem('freshco_saved_name', customerName);
+      if (state.currentUser) state.currentUser.phone = customerPhone;
     } else {
       // Guest order - use guest endpoint
       order = await apiFetch('/orders/guest', {
@@ -966,10 +1007,14 @@ async function handleCheckout() {
           order_type: orderType,
           customer_name: customerName,
           customer_phone: customerPhone,
+          delivery_address: line1,
           notes: notes,
           items: state.cart.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
         }
       });
+      // Save details for unregistered user ease on later orders
+      localStorage.setItem('freshco_saved_phone', customerPhone);
+      if (line1) localStorage.setItem('freshco_saved_address', line1);
     }
 
     state.cart = [];
@@ -977,10 +1022,49 @@ async function handleCheckout() {
     appliedCouponCode = '';
     updateCartBadge();
     document.getElementById('cart-modal').classList.remove('active');
-    showToast('Order #' + (order.order_number || order.id) + ' confirmed! WhatsApp notification sent to ' + customerPhone, 'success');
-    switchTab('orders');
+    showToast('Order #' + (order.order_number || order.id) + ' confirmed!', 'success');
+    openOrderConfirmModal(order, customerName, customerPhone);
   } catch (e) {
     showToast(e.message, 'error');
+  }
+}
+
+function openOrderConfirmModal(order, customerName, customerPhone) {
+  const modal = document.getElementById('order-confirm-modal');
+  if (!modal) {
+    switchTab('orders');
+    return;
+  }
+  const details = document.getElementById('order-confirm-details');
+  if (details) {
+    const itemsCount = order.items ? order.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
+    details.innerHTML = '' +
+      '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><strong>Order ID:</strong><span style="font-weight:800; color:var(--primary);">' + escapeHtml(order.order_number) + '</span></div>' +
+      '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><strong>Customer:</strong><span>' + escapeHtml(customerName || 'Valued Guest') + '</span></div>' +
+      '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><strong>WhatsApp Phone:</strong><span>' + escapeHtml(customerPhone || order.customer_phone || '') + '</span></div>' +
+      '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><strong>Total Amount:</strong><span style="font-weight:800; color:var(--primary);">' + money(order.total) + '</span></div>' +
+      '<div style="font-size:12px; color:var(--text-muted); margin-top:10px; border-top:1px dashed var(--border); padding-top:8px;">' +
+        '<i class="fa-solid fa-clock" style="color:var(--accent);"></i> Live kitchen status: <strong>' + escapeHtml(order.status) + '</strong> (' + itemsCount + ' items)</div>';
+  }
+  const btn = document.getElementById('order-whatsapp-btn');
+  if (btn && order.whatsapp_url) {
+    btn.href = order.whatsapp_url;
+    btn.style.display = 'inline-flex';
+  } else if (btn) {
+    btn.href = 'https://wa.me/923348984654?text=' + encodeURIComponent('Hello Freshco Bakers, tracking Order ' + order.order_number);
+  }
+  state.lastPlacedOrder = order;
+  modal.classList.add('active');
+}
+
+function closeOrderConfirmModal() {
+  const modal = document.getElementById('order-confirm-modal');
+  if (modal) modal.classList.remove('active');
+  switchTab('orders');
+  if (state.lastPlacedOrder) {
+    const input = document.getElementById('order-search-input');
+    if (input) input.value = state.lastPlacedOrder.order_number;
+    renderSingleOrderCard(state.lastPlacedOrder);
   }
 }
 
@@ -1250,14 +1334,20 @@ async function lookupSpecificOrder() {
   const query = (document.getElementById('order-search-input').value || '').trim();
   if (!query) { showToast('Please enter an order number.', 'error'); return; }
   try {
-    const page = await apiFetch('/orders');
-    const match = page.items.find(o => o.order_number.toLowerCase().includes(query.toLowerCase()));
-    if (!match) {
-      showToast('Order ' + query + ' not found in your account.', 'error');
-      return;
+    // Try public guest tracking endpoint first (works for both guests and logged-in users)
+    const order = await apiFetch('/orders/guest/track?order_number=' + encodeURIComponent(query.toUpperCase()), { auth: false });
+    renderSingleOrderCard(order);
+  } catch (e) {
+    // Fallback: if logged in, also try searching in the user's own orders
+    if (isLoggedIn()) {
+      try {
+        const page = await apiFetch('/orders');
+        const match = page.items.find(o => o.order_number.toLowerCase().includes(query.toLowerCase()));
+        if (match) { renderSingleOrderCard(match); return; }
+      } catch (_) {}
     }
-    renderSingleOrderCard(match);
-  } catch (e) { showToast(e.message, 'error'); }
+    showToast('Order ' + query + ' not found. Please check the order number.', 'error');
+  }
 }
 
 function renderSingleOrderCard(o) {
@@ -1279,7 +1369,7 @@ function renderOrderHtml(o) {
   if (o.status === 'PENDING') currentIdx = 0;
   else if (o.status === 'CONFIRMED') currentIdx = 1;
   else if (o.status === 'PREPARING' || o.status === 'IN_PROGRESS') currentIdx = 2;
-  else if (o.status === 'READY') currentIdx = 3;
+  else if (o.status === 'READY' || o.status === 'OUT_FOR_DELIVERY') currentIdx = 3;
   else if (o.status === 'DELIVERED' || o.status === 'PICKED_UP' || o.status === 'DONE') currentIdx = 4;
   else if (o.status === 'CANCELLED') currentIdx = -1;
 
@@ -1318,6 +1408,7 @@ function renderOrderHtml(o) {
         '<div>' +
           '<div style="font-size:13px; font-weight:700; color:var(--text-main); margin-bottom:4px;"><i class="fa-solid fa-bag-shopping" style="color:var(--accent);"></i> Items: ' + itemsText + '</div>' +
           '<div style="font-size:12px; color:var(--text-muted);"><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> Live updates active for WhatsApp: ' + escapeHtml(o.customer_phone || 'Registered') + '</div>' +
+          (o.whatsapp_url ? '<div style="margin-top:8px;"><a href="' + o.whatsapp_url + '" target="_blank" class="btn-secondary btn-sm" style="color:#25D366; border-color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;"><i class="fa-brands fa-whatsapp"></i> Open in WhatsApp</a></div>' : '') +
         '</div>' +
         '<div style="text-align:right;">' +
           '<div style="font-size:12px; color:var(--text-muted);">Total Amount</div>' +
@@ -1525,11 +1616,12 @@ async function refreshAdminProducts() {
         '<tr><td style="font-weight:700;">' + escapeHtml(p.sku) + '</td><td>' + escapeHtml(p.name) + '</td>' +
           '<td style="font-weight:700;">' + money(p.sale_price != null ? p.sale_price : p.price) + '</td>' +
           '<td><span class="status-badge status-' + (p.status === 'active' ? 'DELIVERED' : 'CANCELLED') + '">' + p.status + '</span></td>' +
-          '<td style="display:flex; gap:8px;">' +
+          '<td style="display:flex; gap:8px; flex-wrap:wrap;">' +
             '<button class="btn-secondary btn-sm" onclick="openProductModalById(' + p.id + ')">Edit</button>' +
             (p.status === 'active'
               ? '<button class="btn-danger-sm" onclick="archiveProduct(' + p.id + ')">Archive</button>'
               : '<button class="btn-secondary btn-sm" onclick="unarchiveProduct(' + p.id + ')"><i class="fa-solid fa-box-open"></i> Unarchive</button>') +
+            '<button class="btn-danger-sm" onclick="deleteProductPermanently(' + p.id + ', \'' + escapeHtml(p.name) + '\')"><i class="fa-solid fa-trash"></i> Remove</button>' +
           '</td></tr>').join('') +
       '</tbody></table>';
   } catch (e) {
@@ -1596,6 +1688,13 @@ async function unarchiveProduct(id) {
   catch (e) { showToast(e.message, 'error'); }
 }
 
+async function deleteProductPermanently(id, name) {
+  if (!confirm('PERMANENTLY DELETE "' + name + '"?\n\nThis cannot be undone. The product will be completely removed from the database.')) return;
+  if (!confirm('Are you absolutely sure? This will permanently remove "' + name + '" from the system.')) return;
+  try { await apiFetch('/products/' + id + '/permanent', { method: 'DELETE' }); showToast('Product permanently deleted.', 'success'); await loadCatalogData(); refreshAdminProducts(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
 // --- Admin: orders kanban
 // DONE column is last so it renders on the right side of the board
 const KANBAN_COLUMNS = [
@@ -1614,7 +1713,15 @@ async function renderAdminKanban(container) {
   container.innerHTML = '<div style="margin-bottom:24px;"><h2>Kitchen Orders Kanban Board</h2>' +
     '<p style="color:var(--text-muted);">Live order status workflow &amp; fulfillment tracking</p></div>' +
     '<div id="kanban-board"><p style="color:var(--text-muted);">Loading...</p></div>' +
-    '<style>#kanban-board .kanban-board { display:flex; flex-direction:row; gap:16px; overflow-x:auto; align-items:flex-start; } #kanban-board .kanban-col { min-width:200px; flex:1; }</style>';
+    '<style>' +
+      '#kanban-board .kanban-board { display:flex; flex-direction:row; gap:16px; overflow-x:auto; align-items:flex-start; }' +
+      '#kanban-board .kanban-col { min-width:200px; flex:1; }' +
+      '.kanban-scroll-list { max-height:540px; overflow-y:auto; overflow-x:hidden; padding-right:6px; scrollbar-width:thin; scrollbar-color:var(--primary) #F5EDE4; }' +
+      '.kanban-scroll-list::-webkit-scrollbar { width:8px; }' +
+      '.kanban-scroll-list::-webkit-scrollbar-track { background:#F5EDE4; border-radius:4px; }' +
+      '.kanban-scroll-list::-webkit-scrollbar-thumb { background:var(--primary); border-radius:4px; }' +
+      '.kanban-scroll-list::-webkit-scrollbar-thumb:hover { background:var(--primary-dark); }' +
+    '</style>';
   await refreshKanban();
 }
 
@@ -1647,7 +1754,10 @@ async function refreshKanban() {
           '<div style="font-size:12px; color:var(--text-muted);">' + escapeHtml(o.customer_name || 'Guest') + ' &middot; ' + o.order_type + '</div>' +
           '<div style="margin-top:8px; font-weight:800; color:var(--primary);">' + money(o.total) + '</div>' + nextBtn + readyBtn + cancelBtn + '</div>';
       }).join('') || '<p style="font-size:13px; color:var(--text-muted); padding:8px;">No orders</p>';
-      return '<div class="kanban-col"><div class="kanban-header">' + col.label.toUpperCase() + ' (' + orders2.length + ')</div>' + cards + '</div>';
+      const content = col.status === 'DONE'
+        ? '<div class="kanban-scroll-list">' + cards + '</div>'
+        : cards;
+      return '<div class="kanban-col"><div class="kanban-header">' + col.label.toUpperCase() + ' (' + orders2.length + ')</div>' + content + '</div>';
     }).join('') + '</div>';
   } catch (e) {
     el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
@@ -1670,11 +1780,10 @@ async function renderAdminInventory(container) {
   }
   const productOptions = state.products.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
   container.innerHTML = '' +
-    '<div style="margin-bottom:24px;"><h2>Inventory Management</h2><p style="color:var(--text-muted);">Branch-level stock levels &amp; quick stock adjustments</p></div>' +
+    '<div style="margin-bottom:24px;"><h2>Inventory Management</h2><p style="color:var(--text-muted);">Stock levels &amp; quick stock adjustments</p></div>' +
     '<div class="section-card"><h3 style="margin-bottom:12px;">Quick Stock Adjustment</h3>' +
-      '<form onsubmit="handleStockAdjust(event)" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">' +
+      '<form onsubmit="handleStockAdjust(event)" style="display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:10px; align-items:end;">' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Product</label><select id="adj-product" class="form-select">' + productOptions + '</select></div>' +
-        '<div class="form-group" style="margin:0;"><label class="form-label">Branch ID</label><input id="adj-branch" type="number" class="form-control" value="1" required></div>' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Type</label><select id="adj-type" class="form-select"><option>PURCHASE</option><option>WASTE</option><option>ADJUSTMENT</option><option>RETURN</option></select></div>' +
         '<div class="form-group" style="margin:0;"><label class="form-label">Qty</label><input id="adj-qty" type="number" class="form-control" value="10" required></div>' +
         '<button class="btn-primary" type="submit">Apply</button>' +
@@ -1688,8 +1797,8 @@ async function refreshInventory() {
   try {
     const page = await apiFetch('/inventory?limit=100');
     if (!page.items.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-boxes-stacked"></i><p>No stock records yet. Use the form above to add stock.</p></div>'; return; }
-    el.innerHTML = '<table class="admin-table"><thead><tr><th>Product</th><th>Branch</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>Status</th></tr></thead><tbody>' +
-      page.items.map(i => '<tr><td>' + escapeHtml(i.product_name) + '</td><td>' + escapeHtml(i.branch_name) + '</td>' +
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Product</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>Status</th></tr></thead><tbody>' +
+      page.items.map(i => '<tr><td>' + escapeHtml(i.product_name) + '</td>' +
         '<td>' + i.quantity + '</td><td>' + i.reserved_quantity + '</td><td>' + i.available_quantity + '</td>' +
         '<td>' + (i.is_low ? '<span class="status-badge status-CANCELLED">Low Stock</span>' : '<span class="status-badge status-DELIVERED">OK</span>') + '</td></tr>').join('') +
       '</tbody></table>';
@@ -1702,7 +1811,7 @@ async function handleStockAdjust(event) {
   event.preventDefault();
   const payload = {
     product_id: Number(document.getElementById('adj-product').value),
-    branch_id: Number(document.getElementById('adj-branch').value),
+    branch_id: 1,
     type: document.getElementById('adj-type').value,
     quantity: Number(document.getElementById('adj-qty').value),
   };
@@ -1785,11 +1894,13 @@ async function renderAdminStaff(container) {
 async function refreshStaff() {
   const el = document.getElementById('staff-table');
   try {
-    const staff = await apiFetch('/staff');
+    const rawStaff = await apiFetch('/staff');
+    const staff = (rawStaff || []).filter(s => s.name !== 'Zain Manager' && s.email !== 'manager@freshco.com');
     if (!staff.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-users"></i><p>No staff members yet.</p></div>'; return; }
-    el.innerHTML = '<table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>' +
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
       staff.map(s => '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.email) + '</td><td style="text-transform:capitalize;">' + s.role + '</td>' +
-        '<td><span class="status-badge status-DELIVERED">' + s.status + '</span></td></tr>').join('') +
+        '<td><span class="status-badge status-DELIVERED">' + s.status + '</span></td>' +
+        '<td><button class="btn-danger-sm" onclick="deleteStaffMember(' + s.id + ', \'' + escapeHtml(s.name) + '\')" title="Remove staff member"><i class="fa-solid fa-trash"></i> Remove</button></td></tr>').join('') +
       '</tbody></table>';
   } catch (e) {
     el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
@@ -1808,6 +1919,15 @@ async function handleAddStaff(event) {
     await apiFetch('/staff', { method: 'POST', body: payload });
     showToast('Staff member added.', 'success');
     event.target.reset();
+    refreshStaff();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteStaffMember(id, name) {
+  if (!confirm('Remove staff member "' + name + '"?\n\nThis will permanently delete their account.')) return;
+  try {
+    await apiFetch('/staff/' + id, { method: 'DELETE' });
+    showToast(name + ' has been removed.', 'success');
     refreshStaff();
   } catch (e) { showToast(e.message, 'error'); }
 }

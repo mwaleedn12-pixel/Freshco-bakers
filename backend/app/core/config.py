@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_SECRET: str = "freshco-n8n-secret-key-2026"
     N8N_TIMEOUT_SECONDS: float = 3.0
 
+    # WhatsApp API & Notifications
+    WHATSAPP_ACCESS_TOKEN: str = ""
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    ULTRAMSG_INSTANCE_ID: str = ""
+    ULTRAMSG_TOKEN: str = ""
+    BAKERY_OWNER_PHONE: str = "923348984654"
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local", "../.env.local", "../.env"),
         env_file_encoding="utf-8",

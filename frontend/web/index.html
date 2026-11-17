@@ -23,19 +23,11 @@
     </div>
   </div>
 
-  <!-- Announcement & Contact Strip -->
-  <div class="top-announcement-strip" id="top-announcement-strip">
-    <div class="announcement-content">
-      <span><i class="fa-solid fa-truck-fast"></i> <strong>Free Delivery</strong> on orders over Rs. 1,500</span>
-      <span class="announcement-divider">•</span>
-      <span><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> Helpline &amp; WhatsApp: <strong>0334-8984654</strong></span>
-    </div>
-  </div>
 
   <!-- Header -->
   <header class="app-header">
     <div class="header-container">
-      <a href="#" class="brand-logo" onclick="switchTab('home')">
+      <a href="javascript:void(0)" class="brand-logo" onclick="switchTab('home')">
         <div class="brand-icon"><i class="fa-solid fa-wheat-awn"></i></div>
         <div class="brand-text">
           <span class="brand-title">Freshco Bakers</span>
@@ -106,7 +98,7 @@
       </form>
       <div style="margin-top:16px; text-align:center; font-size:14px;">
         <span id="auth-toggle-text">Don't have an account?</span>
-        <a href="#" onclick="toggleAuthMode()" style="color:var(--primary); font-weight:700; text-decoration:none;" id="auth-toggle-link">Register Now</a>
+        <a href="javascript:void(0)" onclick="toggleAuthMode()" style="color:var(--primary); font-weight:700; text-decoration:none;" id="auth-toggle-link">Register Now</a>
       </div>
 
       <!-- Quick Demo Account Fill -->
@@ -140,6 +132,29 @@
         <button class="btn-secondary" onclick="toggleCartModal()" style="padding:4px 10px;">✕</button>
       </div>
       <div id="cart-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Order Confirmed & WhatsApp Notification Modal -->
+  <div class="modal-overlay" id="order-confirm-modal">
+    <div class="modal-card" style="width:460px; max-width:94vw; text-align:center; padding:32px 24px;">
+      <div style="width:72px; height:72px; border-radius:50%; background:rgba(39, 174, 96, 0.15); color:#27ae60; font-size:36px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h2 style="font-size:22px; color:var(--text-main); margin-bottom:6px;">Order Confirmed!</h2>
+      <p style="font-size:14px; color:var(--text-muted); margin-bottom:18px;">Your bakery order is placed and baking in the oven.</p>
+      
+      <div id="order-confirm-details" style="background:var(--bg-light); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px; text-align:left; font-size:13px;">
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a id="order-whatsapp-btn" href="#" target="_blank" class="btn-primary" style="background:#25D366; border-color:#25D366; color:#fff; font-weight:700; font-size:15px; padding:12px 18px; justify-content:center; text-decoration:none;">
+          <i class="fa-brands fa-whatsapp" style="font-size:20px;"></i> Open Order in WhatsApp
+        </a>
+        <button class="btn-secondary" onclick="closeOrderConfirmModal()" style="width:100%; justify-content:center; padding:10px;">
+          <i class="fa-solid fa-truck-fast"></i> Track Live in Bakery
+        </button>
+      </div>
     </div>
   </div>
 
@@ -193,6 +208,24 @@
         <i class="fa-solid fa-print"></i> Print Receipt (58/80mm)
       </button>
     </div>
+  <!-- Order Confirmation & WhatsApp Notification Modal -->
+  <div class="modal-overlay" id="order-confirm-modal">
+    <div class="modal-card" style="width:480px; max-width:92vw; text-align:center;">
+      <div style="width:64px; height:64px; border-radius:50%; background:rgba(39, 174, 96, 0.15); color:var(--success); display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 16px;">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h3 style="font-size:22px; color:var(--text-main); margin-bottom:6px;">Order Placed Successfully!</h3>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Your delicious freshly-baked items have been sent to our kitchen oven schedule.</p>
+      <div id="order-confirm-details" style="background:var(--bg-light); border:1px solid var(--border); border-radius:12px; padding:16px; text-align:left; margin-bottom:20px; font-size:14px;"></div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a id="order-whatsapp-btn" href="#" target="_blank" class="btn-primary" style="background:#25D366; border-color:#25D366; color:#fff; justify-content:center; font-weight:700; text-decoration:none; padding:12px;">
+          <i class="fa-brands fa-whatsapp" style="font-size:18px;"></i> Open WhatsApp Confirmation
+        </a>
+        <button class="btn-secondary" onclick="closeOrderConfirmModal()" style="justify-content:center; padding:10px;">
+          Track My Order Live
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Website Footer -->
@@ -214,11 +247,11 @@
         <div class="footer-col">
           <h4>Explore Menu</h4>
           <ul class="footer-links">
-            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Cakes');">Celebration Cakes</a></li>
-            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Breads');">Artisan Sourdough &amp; Breads</a></li>
-            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Pastries');">Croissants &amp; Viennoiserie</a></li>
-            <li><a href="#" onclick="switchTab('catalog'); filterCategoryByName('Savory');">Savouries &amp; Quiches</a></li>
-            <li><a href="#" onclick="switchTab('cake')">Custom Cake Studio</a></li>
+            <li><a href="javascript:void(0)" onclick="switchTab('catalog'); filterCategoryByName('Cakes');">Celebration Cakes</a></li>
+            <li><a href="javascript:void(0)" onclick="switchTab('catalog'); filterCategoryByName('Breads');">Artisan Sourdough &amp; Breads</a></li>
+            <li><a href="javascript:void(0)" onclick="switchTab('catalog'); filterCategoryByName('Pastries');">Croissants &amp; Viennoiserie</a></li>
+            <li><a href="javascript:void(0)" onclick="switchTab('catalog'); filterCategoryByName('Savory');">Savouries &amp; Quiches</a></li>
+            <li><a href="javascript:void(0)" onclick="switchTab('cake')">Custom Cake Studio</a></li>
           </ul>
         </div>
 
@@ -244,9 +277,9 @@
           <div style="margin-top:16px;">
             <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Follow Our Bake Daily:</div>
             <div class="social-icons">
-              <a href="#" class="social-btn"><i class="fa-brands fa-instagram"></i></a>
-              <a href="#" class="social-btn"><i class="fa-brands fa-facebook"></i></a>
-              <a href="#" class="social-btn"><i class="fa-brands fa-tiktok"></i></a>
+              <a href="javascript:void(0)" class="social-btn"><i class="fa-brands fa-instagram"></i></a>
+              <a href="javascript:void(0)" class="social-btn"><i class="fa-brands fa-facebook"></i></a>
+              <a href="javascript:void(0)" class="social-btn"><i class="fa-brands fa-tiktok"></i></a>
               <a href="https://wa.me/923348984654" target="_blank" class="social-btn"><i class="fa-brands fa-whatsapp"></i></a>
             </div>
           </div>
@@ -256,7 +289,7 @@
       <div class="footer-bottom">
         <div>© 2026 Freshco Bakers (Pvt) Ltd. All rights reserved. Baked fresh every single morning.</div>
         <div class="footer-bottom-links">
-          <a href="#" onclick="switchTab('orders')">Track Order</a>
+          <a href="javascript:void(0)" onclick="switchTab('orders')">Track Order</a>
         </div>
       </div>
     </div>

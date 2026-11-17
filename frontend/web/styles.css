@@ -1103,3 +1103,27 @@ h1, h2, h3, h4, h5, h6 {
 .footer-bottom-links a:hover {
   color: var(--accent);
 }
+
+/* Kanban Delivered Orders Scrollable Slider */
+.kanban-scroll-list {
+  max-height: 540px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--bg-light);
+}
+.kanban-scroll-list::-webkit-scrollbar {
+  width: 8px;
+}
+.kanban-scroll-list::-webkit-scrollbar-track {
+  background: var(--bg-light);
+  border-radius: 4px;
+}
+.kanban-scroll-list::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+.kanban-scroll-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}
