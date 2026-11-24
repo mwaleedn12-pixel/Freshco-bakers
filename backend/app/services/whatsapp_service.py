@@ -173,53 +173,55 @@ def send_whatsapp_order_notification(
 
     dispatched = False
 
-    # 1. Meta WhatsApp Cloud API if configured
-    if cfg["meta_token"] and cfg["meta_phone_id"]:
-        try:
-            url = f"https://graph.facebook.com/v20.0/{cfg['meta_phone_id']}/messages"
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone,
-                "type": "text",
-                "text": {"preview_url": True, "body": cust_msg},
-            }
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
-                    "Authorization": f"Bearer {cfg['meta_token']}",
-                    "Content-Type": "application/json",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                if 200 <= resp.status < 300:
-                    logger.info("Meta Cloud API WhatsApp sent successfully to %s", phone)
-                    dispatched = True
-        except Exception as e:
-            logger.warning("Meta WhatsApp Cloud API delivery failed: %s", e)
+    def _async_send():
+        # 1. Meta WhatsApp Cloud API if configured
+        if cfg["meta_token"] and cfg["meta_phone_id"]:
+            try:
+                url = f"https://graph.facebook.com/v20.0/{cfg['meta_phone_id']}/messages"
+                payload = {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": phone,
+                    "type": "text",
+                    "text": {"preview_url": True, "body": cust_msg},
+                }
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {cfg['meta_token']}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    if 200 <= resp.status < 300:
+                        logger.info("Meta Cloud API WhatsApp sent successfully to %s", phone)
+            except Exception as e:
+                logger.warning("Meta WhatsApp Cloud API delivery failed: %s", e)
 
-    # 2. UltraMsg WhatsApp API if configured
-    if cfg["ultramsg_id"] and cfg["ultramsg_token"]:
-        try:
-            url = f"https://api.ultramsg.com/{cfg['ultramsg_id']}/messages/chat"
-            payload = {
-                "token": cfg["ultramsg_token"],
-                "to": phone,
-                "body": cust_msg,
-            }
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                if 200 <= resp.status < 300:
-                    logger.info("UltraMsg WhatsApp sent successfully to %s", phone)
-                    dispatched = True
-        except Exception as e:
-            logger.warning("UltraMsg WhatsApp delivery failed: %s", e)
+        # 2. UltraMsg WhatsApp API if configured
+        if cfg["ultramsg_id"] and cfg["ultramsg_token"]:
+            try:
+                url = f"https://api.ultramsg.com/{cfg['ultramsg_id']}/messages/chat"
+                payload = {
+                    "token": cfg["ultramsg_token"],
+                    "to": phone,
+                    "body": cust_msg,
+                }
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    if 200 <= resp.status < 300:
+                        logger.info("UltraMsg WhatsApp sent successfully to %s", phone)
+            except Exception as e:
+                logger.warning("UltraMsg WhatsApp delivery failed: %s", e)
 
-    return dispatched, whatsapp_url
+    import threading
+    threading.Thread(target=_async_send, daemon=True, name="whatsapp-dispatch").start()
+
+    return True, whatsapp_url

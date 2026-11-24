@@ -124,11 +124,12 @@ def change_status(db: Session, *, user: User, order_id: int, new_status: S, note
     log_action(db, user_id=user.id, action="order.status", entity_type="Order", entity_id=order.id,
                old_data={"status": old.value}, new_data={"status": new_status.value, "note": note})
     db.commit()
-    db.expire_all()
 
-    # Trigger n8n Automation Webhook (non-blocking)
+    customer = db.get(User, order.customer_id) if order.customer_id else None
+    address = db.get(Address, order.address_id) if order.address_id else None
+
+    # Trigger n8n Automation Webhook (non-blocking in thread)
     try:
-        customer = db.get(User, order.customer_id) if order.customer_id else None
         webhook_service.dispatch_order_status_updated(
             order_id=order.id,
             order_number=order.order_number,
@@ -142,7 +143,7 @@ def change_status(db: Session, *, user: User, order_id: int, new_status: S, note
     except Exception:
         pass
 
-    return _load(db, order_id)
+    return order, customer, address
 
 
 def set_payment_status(db: Session, *, user: User, order_id: int, new_status: str,

@@ -28,6 +28,9 @@ def lookup_barcode(db: Session, barcode_or_sku: str) -> Product | None:
     )
 
 
+from app.services.order_service import generate_10digit_order_number
+
+
 def create_pos_sale(
     db: Session,
     cashier: User,
@@ -39,7 +42,7 @@ def create_pos_sale(
     notes: str | None = None,
 ) -> Order:
     now_iso = datetime.now(timezone.utc).isoformat()
-    order_num = f"POS-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+    order_num = generate_10digit_order_number(db)
 
     order = Order(
         order_number=order_num,

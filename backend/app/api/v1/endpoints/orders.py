@@ -95,9 +95,14 @@ def admin_get_order(order_id: int, db: Session = Depends(get_db), user: User = D
 @router.patch("/{order_id}/status", response_model=OrderAdminDetailOut)
 def change_status(order_id: int, payload: StatusChange, db: Session = Depends(get_db),
                   user: User = Depends(staff)):
-    order_admin_service.change_status(db, user=user, order_id=order_id, new_status=payload.status,
-                                      note=payload.note)
-    return _admin_detail(db, order_id)
+    order, customer, address = order_admin_service.change_status(db, user=user, order_id=order_id, new_status=payload.status,
+                                                                 note=payload.note)
+    base = OrderDetailOut.model_validate(order).model_dump()
+    return OrderAdminDetailOut(**base,
+                               customer_name=customer.name if customer else None,
+                               customer_phone=customer.phone if customer else None,
+                               customer_email=customer.email if customer else None,
+                               address=address)
 
 
 @router.patch("/{order_id}/payment", response_model=OrderAdminDetailOut)

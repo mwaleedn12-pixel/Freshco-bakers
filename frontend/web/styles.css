@@ -799,7 +799,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pipeline-steps {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin: 24px 0;
   position: relative;
@@ -1126,4 +1126,53 @@ h1, h2, h3, h4, h5, h6 {
 }
 .kanban-scroll-list::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
+}
+
+/* Responsive Two-Column Cart */
+@media (max-width: 768px) {
+  .cart-two-col {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Clean Receipt Printing - Thermal Only */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #receipt-modal,
+  #receipt-modal #thermal-receipt-content,
+  #receipt-modal #thermal-receipt-content * {
+    visibility: visible !important;
+  }
+  #receipt-modal {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #fff !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 999999 !important;
+  }
+  #receipt-modal .modal-card {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    width: 300px !important;
+    max-width: 100% !important;
+    background: #fff !important;
+  }
+  #receipt-modal button,
+  #receipt-modal .modal-header,
+  #app-header,
+  #main-content,
+  #app-footer,
+  #toast-container,
+  #order-confirm-modal {
+    display: none !important;
+  }
 }

@@ -97,6 +97,18 @@ def _attach_whatsapp_url(db: Session, order: Order | None) -> None:
         logger.debug("Could not attach whatsapp_url to order: %s", e)
 
 
+def generate_10digit_order_number(db: Session) -> str:
+    """Generate a unique 10-digit numeric order number (e.g. '1048291048')."""
+    import random
+    for _ in range(20):
+        candidate = str(random.randint(1000000000, 9999999999))
+        exists = db.query(Order.id).filter(Order.order_number == candidate).first()
+        if not exists:
+            return candidate
+    import time
+    return str(int(time.time() * 1000))[-10:]
+
+
 def _load_order(db: Session, order_id: int) -> Order | None:
     order = (
         db.query(Order)
@@ -153,12 +165,10 @@ def checkout(db: Session, user: User, req) -> Order:
     address_id = None
     address = None
     if req.order_type == OrderType.DELIVERY:
-        if req.address_id is None:
-            raise ServiceError("A delivery address is required for delivery orders", 400)
-        address = db.query(Address).filter(Address.id == req.address_id, Address.user_id == user.id).first()
-        if address is None:
-            raise ServiceError("Address not found", 404)
-        address_id = address.id
+        if req.address_id is not None:
+            address = db.query(Address).filter(Address.id == req.address_id, Address.user_id == user.id).first()
+            if address is not None:
+                address_id = address.id
 
     if req.branch_id is not None:
         branch = db.query(Branch).filter(Branch.id == req.branch_id, Branch.status == "active").first()
@@ -224,7 +234,7 @@ def checkout(db: Session, user: User, req) -> Order:
     )
     db.add(order)
     db.flush()
-    order.order_number = f"FB-{order.id:06d}"
+    order.order_number = generate_10digit_order_number(db)
 
     for line in lines:
         db.add(OrderItem(order_id=order.id, product_id=line["product"].id, product_name=line["product"].name,
@@ -337,9 +347,7 @@ def guest_checkout(db: Session, req) -> Order:
     # Address
     address_id = None
     addr_text = getattr(req, "delivery_address", None)
-    if req.order_type == OrderType.DELIVERY:
-        if not addr_text:
-            raise ServiceError("A delivery address is required for delivery orders", 400)
+    if req.order_type == OrderType.DELIVERY and addr_text:
         address = Address(
             user_id=user.id,
             line1=addr_text,
@@ -412,7 +420,7 @@ def guest_checkout(db: Session, req) -> Order:
     )
     db.add(order)
     db.flush()
-    order.order_number = f"FB-{order.id:06d}"
+    order.order_number = generate_10digit_order_number(db)
 
     for line in lines:
         db.add(OrderItem(order_id=order.id, product_id=line["product"].id, product_name=line["product"].name,

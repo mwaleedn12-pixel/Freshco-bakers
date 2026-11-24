@@ -15,6 +15,7 @@ let state = {
   cart: [],                      // [{product_id, name, price, quantity}]
   products: [],                  // flat array (unwrapped from the paginated API response)
   categories: [],
+  isLoadingCatalog: true,
   authMode: 'login',
   staffRoles: ['cashier', 'admin', 'owner'],
   wishlistIds: [],
@@ -48,18 +49,28 @@ function escapeHtml(s) {
 
 /** Central fetch wrapper: adds auth header, parses JSON, throws a readable Error on failure. */
 async function apiFetch(path, options = {}) {
-  const { method = 'GET', body, auth = true } = options;
+  const { method = 'GET', body, auth = true, timeout = 10000 } = options;
   const headers = { 'Content-Type': 'application/json' };
   if (auth && state.token) headers['Authorization'] = `Bearer ${state.token}`;
+  
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeout) : null;
+
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: method,
       headers: headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller ? controller.signal : undefined,
     });
   } catch (e) {
+    if (e && e.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your internet connection.');
+    }
     throw new Error('Could not reach the server. Is the backend running on localhost:8000?');
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   const isJson = (res.headers.get('content-type') || '').indexOf('application/json') !== -1;
   const data = isJson ? await res.json().catch(() => null) : null;
@@ -191,21 +202,26 @@ async function initApp() {
     state.currentTab = 'home';
   }
   setHashTab(state.currentRole, state.currentTab);
+  renderApp(); // Render immediately with active layout so the page is never blank!
   await loadCatalogData();
   await refreshWishlistIds();
   renderApp();
 }
 
 async function loadCatalogData() {
+  state.isLoadingCatalog = true;
   try {
     const productPage = await apiFetch('/products?limit=100', { auth: false });
     const categories = await apiFetch('/categories', { auth: false });
     state.products = productPage.items || [];
     state.categories = categories || [];
   } catch (e) {
-    showToast('Could not load the catalog: ' + e.message, 'error');
+    showToast('Could not load catalog: ' + e.message, 'error');
     state.products = [];
     state.categories = [];
+  } finally {
+    state.isLoadingCatalog = false;
+    renderApp();
   }
 }
 
@@ -232,10 +248,19 @@ async function handleAuthSubmit(event) {
     closeAuthModal();
     document.getElementById('auth-form').reset();
     await refreshWishlistIds();
-    // Safely reset role if regular customer
-    if (!isStaff()) {
+    // Instantly open dashboard based on role
+    if (isAdminOrOwner()) {
+      state.currentRole = 'admin';
+      state.currentTab = 'overview';
+      setHashTab('admin', 'overview');
+    } else if (isStaff()) {
+      state.currentRole = state.currentUser.role === 'cashier' ? 'pos' : 'admin';
+      state.currentTab = state.currentRole === 'pos' ? 'pos' : 'overview';
+      setHashTab(state.currentRole, state.currentTab);
+    } else {
       state.currentRole = 'customer';
       state.currentTab = 'home';
+      setHashTab('customer', 'home');
     }
     renderApp();
   } catch (e) {
@@ -458,7 +483,7 @@ function productCard(p) {
     '<div class="tilt-card" data-tilt style="position:relative; display:flex; flex-direction:column; height:100%;">' +
       '<button class="wishlist-heart ' + (inWishlist ? 'active' : '') + '" onclick="event.stopPropagation(); toggleWishlist(' + p.id + ')" title="Save to wishlist">' +
         '<i class="fa-' + (inWishlist ? 'solid' : 'regular') + ' fa-heart"></i></button>' +
-      (p.is_featured ? '<div class="product-badge"><i class="fa-solid fa-fire"></i> Fresh Today</div>' : '') +
+      (p.is_featured ? '' : '') +
       productImageHtml(p, 170) +
       '<div class="product-info" style="display:flex; flex-direction:column; flex:1;">' +
         '<h3 class="product-title">' + escapeHtml(p.name) + '</h3>' +
@@ -466,7 +491,7 @@ function productCard(p) {
         ratingHtml(p) +
         '<div style="margin-bottom:8px;">' + (unavailable
           ? '<span class="status-badge status-CANCELLED">Out of Stock</span>'
-          : '<span class="status-badge status-DELIVERED">In Oven / Available</span>') + '</div>' +
+          : '<span class="status-badge status-DELIVERED">AVAILABLE</span>') + '</div>' +
         '<div class="product-bottom" style="margin-top:auto;">' +
           '<div class="product-price">' + money(price) + (p.sale_price ? ' <span style="text-decoration:line-through; color:#999; font-size:13px;">' + money(p.price) + '</span>' : '') + '</div>' +
         '</div>' +
@@ -614,7 +639,7 @@ function renderCustomerHome() {
         '<p style="font-size:16px; color:#E8DCCF; margin-bottom:24px; line-height:1.5;">Experience pure luxury bakery made with 100% French butter, natural sourdough cultures, and Belgian couverture chocolate.</p>' +
         '<div style="display:flex; gap:12px; flex-wrap:wrap;">' +
           '<button class="btn-primary" onclick="switchTab(\'catalog\')" style="padding:14px 28px; font-size:15px; font-weight:700;">' +
-            '<i class="fa-solid fa-cookie-bite"></i> Order Fresh Menu</button>' +
+            '<i class="fa-solid fa-cookie-bite"></i> Order Menu</button>' +
           '<button class="btn-secondary" onclick="switchTab(\'cake\')" style="padding:14px 24px; font-size:15px; background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.3);">' +
             '<i class="fa-solid fa-cake-candles" style="color:var(--accent);"></i> Custom Cake Studio</button>' +
         '</div>' +
@@ -627,30 +652,6 @@ function renderCustomerHome() {
           '<button class="btn-primary" onclick="switchTab(\'cake\')" style="width:100%; justify-content:center; padding:12px;">' +
             '<i class="fa-solid fa-wand-magic-sparkles"></i> Design Your Cake Now</button>' +
         '</div>' +
-      '</div>' +
-    '</div>' +
-
-    '<!-- 4 USP Cards Grid -->' +
-    '<div class="usp-grid">' +
-      '<div class="usp-card">' +
-        '<div class="usp-icon"><i class="fa-solid fa-cheese"></i></div>' +
-        '<div class="usp-title">100% Pure Butter</div>' +
-        '<div class="usp-desc">Never any hydrogenated fats or margarine. Only pure European dairy butter.</div>' +
-      '</div>' +
-      '<div class="usp-card">' +
-        '<div class="usp-icon"><i class="fa-solid fa-fire-burner"></i></div>' +
-        '<div class="usp-title">Baked Fresh Daily</div>' +
-        '<div class="usp-desc">Small-batch baking around the clock ensures peak aroma, warmth, and fluffiness.</div>' +
-      '</div>' +
-      '<div class="usp-card">' +
-        '<div class="usp-icon"><i class="fa-solid fa-shield-virus"></i></div>' +
-        '<div class="usp-title">Zero Preservatives</div>' +
-        '<div class="usp-desc">Naturally fermented sourdoughs with 24-hour cold proofing for easy digestion.</div>' +
-      '</div>' +
-      '<div class="usp-card">' +
-        '<div class="usp-icon"><i class="fa-solid fa-truck-snowflake"></i></div>' +
-        '<div class="usp-title">Cool-Chain Delivery</div>' +
-        '<div class="usp-desc">Specialized shock-proof suspension delivery vans keep your delicate cakes flawless.</div>' +
       '</div>' +
     '</div>' +
 
@@ -698,26 +699,22 @@ function renderCatalogView() {
       '<i class="fa-solid ' + c.icon + '"></i> ' + escapeHtml(c.name) + '</button>';
   }).join('');
 
-  const grid = state.products.length ? state.products.map(productCard).join('')
-    : '<div class="empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-magnifying-glass"></i><p>No bakery items found.</p></div>';
+  const grid = state.isLoadingCatalog
+    ? '<div class="empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--primary); margin-bottom:12px;"></i><p>Loading Products...</p></div>'
+    : (state.products.length ? state.products.map(productCard).join('')
+      : '<div class="empty-state" style="grid-column:1/-1;"><i class="fa-solid fa-magnifying-glass"></i><p>No bakery items found.</p></div>');
 
   return '' +
     '<div style="margin-bottom:24px;">' +
-      '<h2 style="font-size:26px; color:var(--text-main); margin-bottom:4px;">Freshly Baked Daily Menu</h2>' +
+      '<h2 style="font-size:26px; color:var(--text-main); margin-bottom:4px;">Menu</h2>' +
       '<p style="color:var(--text-muted); font-size:14px;">Select from our full range of handcrafted breads, gourmet gateaux, and savoury puffs.</p>' +
     '</div>' +
-
-    '<div class="category-pills">' + pillsHtml + '</div>' +
 
     '<div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px 20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">' +
       '<div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; flex:1;">' +
         '<div style="position:relative; min-width:280px; flex:1;">' +
           '<i class="fa-solid fa-magnifying-glass" style="position:absolute; left:14px; top:13px; color:var(--text-muted);"></i>' +
           '<input type="text" id="catalog-search" class="form-control" placeholder="Search cakes, sourdough, croissants, patties..." onkeyup="filterCatalog()" style="padding-left:38px;">' +
-        '</div>' +
-        '<div style="display:flex; gap:10px; align-items:center;">' +
-          '<label style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="filter-eggless" onchange="filterCatalog()"> Eggless</label>' +
-          '<label style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="filter-sugarfree" onchange="filterCatalog()"> Sugar-Free</label>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex; gap:8px; align-items:center;">' +
@@ -749,8 +746,6 @@ function filterCategoryByName(catName) {
 function filterCatalog() {
   const term = (document.getElementById('catalog-search') ? document.getElementById('catalog-search').value : '').toLowerCase().trim();
   const sortMode = document.getElementById('catalog-sort') ? document.getElementById('catalog-sort').value : 'default';
-  const isEggless = document.getElementById('filter-eggless') ? document.getElementById('filter-eggless').checked : false;
-  const isSugarFree = document.getElementById('filter-sugarfree') ? document.getElementById('filter-sugarfree').checked : false;
   const grid = document.getElementById('catalog-grid');
   if (!grid) return;
 
@@ -758,9 +753,7 @@ function filterCatalog() {
     const text = (p.name + ' ' + (p.description || '')).toLowerCase();
     const matchesTerm = !term || text.indexOf(term) !== -1;
     const matchesCat = !activeCategoryFilter || text.indexOf(activeCategoryFilter.toLowerCase()) !== -1;
-    const matchesEggless = !isEggless || text.indexOf('eggless') !== -1 || text.indexOf('bread') !== -1;
-    const matchesSugarFree = !isSugarFree || text.indexOf('sugar-free') !== -1 || text.indexOf('sourdough') !== -1;
-    return matchesTerm && matchesCat && matchesEggless && matchesSugarFree;
+    return matchesTerm && matchesCat;
   });
 
   if (sortMode === 'price-low') {
@@ -843,7 +836,7 @@ function renderCartModal() {
 
   if (!state.cart.length) {
     body.innerHTML = '<div class="empty-state"><i class="fa-solid fa-basket-shopping"></i><p>Your shopping basket is empty.</p>' +
-      '<button class="btn-primary" onclick="toggleCartModal(); switchTab(\'catalog\');" style="margin-top:12px;">Browse Fresh Menu</button></div>';
+      '<button class="btn-primary" onclick="toggleCartModal(); switchTab(\'catalog\');" style="margin-top:12px;">Browse Menu</button></div>';
     return;
   }
 
@@ -859,75 +852,70 @@ function renderCartModal() {
     '</div>').join('');
 
   const isReg = isLoggedIn();
-  const savedPhone = localStorage.getItem('freshco_saved_phone') || '';
-  const savedName = localStorage.getItem('freshco_saved_name') || '';
-  const defaultPhone = (state.currentUser && state.currentUser.phone) ? state.currentUser.phone : (savedPhone || '');
-  const defaultName = isReg ? (state.currentUser.name || '') : (savedName || '');
-  const defaultAddress = localStorage.getItem('freshco_saved_address') || '';
+  const defaultPhone = isReg ? ((state.currentUser && state.currentUser.phone) || '') : '';
+  const defaultName = isReg ? (state.currentUser.name || '') : '';
+  const defaultAddress = isReg ? (localStorage.getItem('freshco_saved_address') || '') : '';
 
-  body.innerHTML = rows +
-    '<!-- Coupon Code Box -->' +
-    '<div style="margin:14px 0 10px; display:flex; gap:8px;">' +
-      '<input type="text" id="coupon-input" class="form-control" placeholder="Promo Code (e.g. WELCOME10)" value="' + escapeHtml(appliedCouponCode) + '" style="text-transform:uppercase; font-size:13px;">' +
-      '<button type="button" class="btn-secondary" onclick="applyPromoCode()" style="padding:8px 16px; font-weight:700;">Apply</button>' +
-    '</div>' +
+  body.innerHTML = '' +
+    '<div class="cart-two-col" style="display:grid; grid-template-columns:1.05fr 0.95fr; gap:20px; align-items:start;">' +
 
-    '<!-- Price Summary -->' +
-    '<div style="background:var(--bg-light); padding:12px; border-radius:10px; border:1px solid var(--border); margin-bottom:16px; font-size:13px;">' +
-      '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Subtotal:</span><strong>' + money(subtotal) + '</strong></div>' +
-      (discountAmount > 0 ? '<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--success);"><span>Discount (' + (appliedCouponDiscount * 100) + '%):</span><strong>-' + money(discountAmount) + '</strong></div>' : '') +
-      '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Delivery Fee:</span><span>' + (deliveryFee === 0 ? '<span style="color:var(--success); font-weight:700;">FREE (Orders > Rs 1,500)</span>' : money(deliveryFee)) + '</span></div>' +
-      '<div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:6px; font-size:16px; font-weight:800; color:var(--primary);"><span>Total Amount:</span><span>' + money(total) + '</span></div>' +
-    '</div>' +
+      '<!-- LEFT MENU: Customer Input Data -->' +
+      '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px;">' +
+        '<div style="font-weight:700; font-size:14px; margin-bottom:12px; color:var(--text-main);"><i class="fa-solid fa-truck" style="color:var(--accent); margin-right:6px;"></i> Delivery &amp; Contact Details</div>' +
 
-    '<!-- Checkout Form -->' +
-    '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px;">' +
-      '<div style="font-weight:700; font-size:14px; margin-bottom:12px; color:var(--text-main);"><i class="fa-solid fa-truck" style="color:var(--accent); margin-right:6px;"></i> Delivery &amp; Contact Details</div>' +
-      
-      // For guests we need a name; for registered users it's pre-filled from account
-      (!isReg ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Your Full Name <span style="color:var(--danger);">*</span></label>' +
-        '<input type="text" id="checkout-name" class="form-control" placeholder="e.g. Sara Ali" value="' + escapeHtml(defaultName) + '" required></div>' :
-        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Customer Name</label>' +
-        '<input type="text" id="checkout-name" class="form-control" value="' + escapeHtml(defaultName) + '" readonly style="background:var(--bg-light); cursor:not-allowed;"></div>') +
-      
-      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">WhatsApp Mobile Number <span style="color:var(--primary); font-size:11px;">(For Live Updates)</span></label>' +
-        '<input type="tel" id="checkout-phone" class="form-control" placeholder="e.g. 03348984654" value="' + escapeHtml(defaultPhone) + '" required></div>' +
-      
-      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">' +
-        '<div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:12px;">Fulfillment Type</label>' +
+        (!isReg ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Your Full Name <span style="color:var(--danger);">*</span></label>' +
+          '<input type="text" id="checkout-name" class="form-control" value="" required></div>' :
+          '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Customer Name</label>' +
+          '<input type="text" id="checkout-name" class="form-control" value="' + escapeHtml(defaultName) + '" readonly style="background:var(--bg-light); cursor:not-allowed;"></div>') +
+
+        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">WhatsApp Mobile Number <span style="color:var(--danger);">*</span></label>' +
+          '<input type="tel" id="checkout-phone" class="form-control" placeholder="03xxxxxxxxx" maxlength="11" value="' + escapeHtml(defaultPhone) + '" required></div>' +
+
+        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Order Type</label>' +
           '<select id="checkout-order-type" class="form-select">' +
             '<option value="DELIVERY">Home Delivery</option>' +
             '<option value="PICKUP">Pickup from Counter</option>' +
           '</select></div>' +
-        '<div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:12px;">Preferred Time Slot</label>' +
-          '<select id="checkout-slot" class="form-select">' +
-            '<option value="Express">Express (45-60 min)</option>' +
-            '<option value="Morning">Morning (09:00 - 12:00)</option>' +
-            '<option value="Afternoon">Afternoon (01:00 - 05:00)</option>' +
-            '<option value="Evening">Evening (06:00 - 09:00)</option>' +
+
+        '<div class="form-group" id="checkout-branch-group" style="display:none; margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Pickup Location</label>' +
+          '<input type="text" id="checkout-branch" class="form-control" value="Ali Town Near Bank Alfalah, Adyala Road, Rawalpindi" readonly style="background:var(--bg-light); cursor:not-allowed;"></div>' +
+
+        '<div class="form-group" id="checkout-address-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Delivery Address</label>' +
+          '<input type="text" id="checkout-address" class="form-control" placeholder="House #, Street, Block, Area, City" value="' + escapeHtml(defaultAddress) + '"></div>' +
+
+        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Payment Method</label>' +
+          '<select id="checkout-payment-method" class="form-select">' +
+            '<option value="COD">Cash on Delivery (COD)</option>' +
+            '<option value="CARD">Debit / Credit Card (POS on Delivery)</option>' +
+            '<option value="ONLINE">JazzCash / EasyPaisa Online Transfer</option>' +
           '</select></div>' +
+
+        '<div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:12px;">Special Instructions</label>' +
+          '<input type="text" id="checkout-notes" class="form-control" value=""></div>' +
       '</div>' +
 
-      '<div class="form-group" id="checkout-branch-group" style="display:none; margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Pickup Location</label>' +
-        '<select id="checkout-branch" class="form-select">' +
-          '<option value="Adyala">Ali Town Near Bank Alfalah, Adyala Road, Rawalpindi</option>' +
-        '</select></div>' +
+      '<!-- RIGHT MENU: Products in cart, Promo code, Amount calculation, Place Order button -->' +
+      '<div>' +
+        '<div style="max-height:220px; overflow-y:auto; margin-bottom:12px; padding-right:4px;">' + rows + '</div>' +
 
-      '<div class="form-group" id="checkout-address-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Delivery Address</label>' +
-        '<input type="text" id="checkout-address" class="form-control" placeholder="House #, Street, Block, Area, City" value="' + escapeHtml(defaultAddress) + '"></div>' +
+        '<!-- Promo Code Box -->' +
+        '<div style="margin:10px 0; display:flex; gap:8px;">' +
+          '<input type="text" id="coupon-input" class="form-control" placeholder="Promo Code (e.g. WELCOME10)" value="' + escapeHtml(appliedCouponCode) + '" style="text-transform:uppercase; font-size:13px;">' +
+          '<button type="button" class="btn-secondary" onclick="applyPromoCode()" style="padding:8px 16px; font-weight:700;">Apply</button>' +
+        '</div>' +
 
-      '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Payment Method</label>' +
-        '<select id="checkout-payment-method" class="form-select">' +
-          '<option value="COD">Cash on Delivery (COD)</option>' +
-          '<option value="CARD">Debit / Credit Card (POS on Delivery)</option>' +
-          '<option value="ONLINE">JazzCash / EasyPaisa Online Transfer</option>' +
-        '</select></div>' +
+        '<!-- Amount calculation box -->' +
+        '<div style="background:var(--bg-light); padding:12px; border-radius:10px; border:1px solid var(--border); margin-bottom:16px; font-size:13px;">' +
+          '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Subtotal:</span><strong>' + money(subtotal) + '</strong></div>' +
+          (discountAmount > 0 ? '<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--success);"><span>Discount (' + (appliedCouponDiscount * 100) + '%):</span><strong>-' + money(discountAmount) + '</strong></div>' : '') +
+          '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Delivery Fee:</span><span>' + (deliveryFee === 0 ? '<span style="color:var(--success); font-weight:700;">FREE (Orders > Rs 1,500)</span>' : money(deliveryFee)) + '</span></div>' +
+          '<div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:6px; font-size:16px; font-weight:800; color:var(--primary);"><span>Total Amount:</span><span>' + money(total) + '</span></div>' +
+        '</div>' +
 
-      '<div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:12px;">Special Delivery / Cake Instructions</label>' +
-        '<input type="text" id="checkout-notes" class="form-control" placeholder="e.g. Ring bell twice, handle delicate cake with care"></div>' +
-    '</div>' +
+        '<button class="btn-primary" id="btn-place-order" style="width:100%; justify-content:center; padding:14px; font-weight:800; font-size:16px;" onclick="handleCheckout()"><i class="fa-solid fa-circle-check"></i> Place Order</button>' +
+      '</div>' +
 
-    '<button class="btn-primary" style="width:100%; justify-content:center; padding:14px; font-weight:800; font-size:16px;" onclick="handleCheckout()"><i class="fa-solid fa-circle-check"></i> Place Order Now (' + money(total) + ')</button>';
+    '</div>';
 
   document.getElementById('checkout-order-type').onchange = function (e) {
     const isDelivery = e.target.value === 'DELIVERY';
@@ -953,14 +941,25 @@ async function handleCheckout() {
     }
   }
   const customerPhone = document.getElementById('checkout-phone').value.trim();
-  const slot = document.getElementById('checkout-slot').value;
-  const notes = (document.getElementById('checkout-notes') ? document.getElementById('checkout-notes').value.trim() : '') + (slot ? ' [Time Slot: ' + slot + ']' : '');
+  const notes = document.getElementById('checkout-notes') ? document.getElementById('checkout-notes').value.trim() : '';
   let addressId = null;
 
   if (!customerPhone) {
-    showToast('Please enter your WhatsApp mobile number for order confirmation.', 'error');
+    showToast('Please enter your WhatsApp mobile number.', 'error');
     document.getElementById('checkout-phone').focus();
     return;
+  }
+  const phonePattern = /^03\d{9}$/;
+  if (!phonePattern.test(customerPhone)) {
+    showToast('Please enter WhatsApp number in 03xxxxxxxxx format (must be exactly 11 digits starting with 03).', 'error');
+    document.getElementById('checkout-phone').focus();
+    return;
+  }
+
+  const placeBtn = document.getElementById('btn-place-order');
+  if (placeBtn) {
+    placeBtn.disabled = true;
+    placeBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Placing Order...';
   }
 
   try {
@@ -968,8 +967,7 @@ async function handleCheckout() {
     if (orderType === 'DELIVERY') {
       const addrEl = document.getElementById('checkout-address');
       line1 = addrEl ? addrEl.value.trim() : '';
-      if (!line1) { showToast('Please enter a delivery address.', 'error'); if (addrEl) addrEl.focus(); return; }
-      if (isLoggedIn()) {
+      if (line1 && isLoggedIn()) {
         try {
           const address = await apiFetch('/addresses', { method: 'POST', body: { line1: line1 } });
           addressId = address.id;
@@ -980,9 +978,9 @@ async function handleCheckout() {
     let order;
     if (isLoggedIn()) {
       await apiFetch('/cart/items', { method: 'DELETE' }).catch(() => {});
-      for (const item of state.cart) {
-        await apiFetch('/cart/items', { method: 'POST', body: { product_id: item.product_id, quantity: item.quantity } });
-      }
+      await Promise.all(state.cart.map(item =>
+        apiFetch('/cart/items', { method: 'POST', body: { product_id: item.product_id, quantity: item.quantity } })
+      )).catch(() => {});
       order = await apiFetch('/orders', {
         method: 'POST',
         body: {
@@ -1025,6 +1023,11 @@ async function handleCheckout() {
     showToast('Order #' + (order.order_number || order.id) + ' confirmed!', 'success');
     openOrderConfirmModal(order, customerName, customerPhone);
   } catch (e) {
+    const placeBtn = document.getElementById('btn-place-order');
+    if (placeBtn) {
+      placeBtn.disabled = false;
+      placeBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Place Order';
+    }
     showToast(e.message, 'error');
   }
 }
@@ -1066,6 +1069,11 @@ function closeOrderConfirmModal() {
     if (input) input.value = state.lastPlacedOrder.order_number;
     renderSingleOrderCard(state.lastPlacedOrder);
   }
+}
+
+function dismissOrderConfirmModal() {
+  const modal = document.getElementById('order-confirm-modal');
+  if (modal) modal.classList.remove('active');
 }
 
 // --------------------------------------------------------- custom cakes studio
@@ -1310,7 +1318,7 @@ async function renderOrdersView(container) {
         '<p style="color:var(--text-muted); font-size:14px;">Monitor your bakes in real-time from flour sifting to doorstep delivery</p>' +
       '</div>' +
       '<div style="display:flex; gap:8px;">' +
-        '<input type="text" id="order-search-input" class="form-control" placeholder="Enter Order # (e.g. ORD-2026-001)" style="width:260px;">' +
+        '<input type="text" id="order-search-input" class="form-control" placeholder="Enter Order # (e.g. 1029384756)" style="width:260px;">' +
         '<button class="btn-primary" onclick="lookupSpecificOrder()"><i class="fa-solid fa-magnifying-glass"></i> Track</button>' +
       '</div>' +
     '</div>' +
@@ -1358,18 +1366,17 @@ function renderSingleOrderCard(o) {
 
 function renderOrderHtml(o) {
   const steps = [
-    { key: 'PENDING', title: 'Order Confirmed', desc: 'Received & Logged', icon: 'fa-clipboard-check' },
-    { key: 'CONFIRMED', title: 'Prep & Sifting', desc: 'Ingredients Ready', icon: 'fa-wheat-awn' },
-    { key: 'PREPARING', title: 'Baking in Oven', desc: 'Hot & Rising', icon: 'fa-fire-burner' },
-    { key: 'READY', title: 'Quality Packed', desc: 'Gift Box Sealing', icon: 'fa-gift' },
-    { key: 'DELIVERED', title: 'Delivered / Ready', desc: 'Enjoy Warm', icon: 'fa-truck-fast' }
+    { key: 'CONFIRMED', title: 'Order Confirmed', desc: 'Received & Logged', icon: 'fa-clipboard-check' },
+    { key: 'PREPARING', title: 'Preparing', desc: 'Baking in Oven', icon: 'fa-fire-burner' },
+    { key: 'READY', title: 'Ready', desc: 'Packed & Sealed', icon: 'fa-gift' },
+    { key: 'DELIVERED', title: 'Out For Delivery', desc: 'On Its Way', icon: 'fa-truck-fast' }
   ];
 
   let currentIdx = 0;
-  if (o.status === 'PENDING') currentIdx = 0;
-  else if (o.status === 'CONFIRMED') currentIdx = 1;
-  else if (o.status === 'PREPARING' || o.status === 'IN_PROGRESS') currentIdx = 2;
-  else if (o.status === 'READY' || o.status === 'OUT_FOR_DELIVERY') currentIdx = 3;
+  if (o.status === 'PENDING' || o.status === 'CONFIRMED') currentIdx = 0;
+  else if (o.status === 'PREPARING' || o.status === 'IN_PROGRESS') currentIdx = 1;
+  else if (o.status === 'READY') currentIdx = 2;
+  else if (o.status === 'OUT_FOR_DELIVERY') currentIdx = 3;
   else if (o.status === 'DELIVERED' || o.status === 'PICKED_UP' || o.status === 'DONE') currentIdx = 4;
   else if (o.status === 'CANCELLED') currentIdx = -1;
 
@@ -1426,7 +1433,7 @@ async function loadCustomerOrders() {
     const page = await apiFetch('/orders');
     if (!page.items.length) {
       list.innerHTML = '<div class="empty-state"><i class="fa-solid fa-receipt"></i><p>You haven\'t placed any orders yet.</p>' +
-        '<button class="btn-primary" onclick="switchTab(\'catalog\')" style="margin-top:12px;">Browse Fresh Menu</button></div>';
+        '<button class="btn-primary" onclick="switchTab(\'catalog\')" style="margin-top:12px;">Browse Menu</button></div>';
       return;
     }
     list.innerHTML = page.items.map(renderOrderHtml).join('');
@@ -1605,27 +1612,33 @@ async function renderAdminProducts(container) {
 
 let adminProductsCache = [];
 
+function renderAdminProductsTable() {
+  const el = document.getElementById('admin-products-table');
+  if (!el) return;
+  if (!adminProductsCache.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>No products yet.</p></div>'; return; }
+  el.innerHTML = '<table class="admin-table"><thead><tr><th>SKU</th><th>Name</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+    adminProductsCache.map(p => '' +
+      '<tr><td style="font-weight:700;">' + escapeHtml(p.sku) + '</td><td>' + escapeHtml(p.name) + '</td>' +
+        '<td style="font-weight:700;">' + money(p.price) + '</td>' +
+        '<td><span class="status-badge status-' + (p.status === 'active' ? 'DELIVERED' : 'CANCELLED') + '">' + p.status + '</span></td>' +
+        '<td style="display:flex; gap:8px; flex-wrap:wrap;">' +
+          '<button class="btn-secondary btn-sm" onclick="openProductModalById(' + p.id + ')">Edit</button>' +
+          (p.status === 'active'
+            ? '<button class="btn-danger-sm" onclick="archiveProduct(' + p.id + ')">Archive</button>'
+            : '<button class="btn-secondary btn-sm" onclick="unarchiveProduct(' + p.id + ')"><i class="fa-solid fa-box-open"></i> Unarchive</button>') +
+          '<button class="btn-danger-sm" onclick="deleteProductPermanently(' + p.id + ', \'' + escapeHtml(p.name) + '\')"><i class="fa-solid fa-trash"></i> Remove</button>' +
+        '</td></tr>').join('') +
+    '</tbody></table>';
+}
+
 async function refreshAdminProducts() {
   const el = document.getElementById('admin-products-table');
   try {
     const page = await apiFetch('/products/admin/list?limit=100');
-    adminProductsCache = page.items;
-    if (!page.items.length) { el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>No products yet.</p></div>'; return; }
-    el.innerHTML = '<table class="admin-table"><thead><tr><th>SKU</th><th>Name</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-      page.items.map(p => '' +
-        '<tr><td style="font-weight:700;">' + escapeHtml(p.sku) + '</td><td>' + escapeHtml(p.name) + '</td>' +
-          '<td style="font-weight:700;">' + money(p.sale_price != null ? p.sale_price : p.price) + '</td>' +
-          '<td><span class="status-badge status-' + (p.status === 'active' ? 'DELIVERED' : 'CANCELLED') + '">' + p.status + '</span></td>' +
-          '<td style="display:flex; gap:8px; flex-wrap:wrap;">' +
-            '<button class="btn-secondary btn-sm" onclick="openProductModalById(' + p.id + ')">Edit</button>' +
-            (p.status === 'active'
-              ? '<button class="btn-danger-sm" onclick="archiveProduct(' + p.id + ')">Archive</button>'
-              : '<button class="btn-secondary btn-sm" onclick="unarchiveProduct(' + p.id + ')"><i class="fa-solid fa-box-open"></i> Unarchive</button>') +
-            '<button class="btn-danger-sm" onclick="deleteProductPermanently(' + p.id + ', \'' + escapeHtml(p.name) + '\')"><i class="fa-solid fa-trash"></i> Remove</button>' +
-          '</td></tr>').join('') +
-      '</tbody></table>';
+    adminProductsCache = page.items || [];
+    renderAdminProductsTable();
   } catch (e) {
-    el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
+    if (el) el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
   }
 }
 
@@ -1640,7 +1653,8 @@ function openProductModal(product) {
   document.getElementById('pf-name').value = product ? product.name : '';
   document.getElementById('pf-sku').value = product ? product.sku : '';
   document.getElementById('pf-price').value = product ? product.price : '';
-  document.getElementById('pf-sale-price').value = (product && product.sale_price != null) ? product.sale_price : '';
+  const saleEl = document.getElementById('pf-sale-price');
+  if (saleEl) saleEl.value = (product && product.sale_price != null) ? product.sale_price : '';
   document.getElementById('pf-description').value = (product && product.description) ? product.description : '';
   document.getElementById('pf-image-url').value = (product && product.images && product.images[0]) ? product.images[0].image_url : '';
   const catSelect = document.getElementById('pf-category');
@@ -1653,11 +1667,12 @@ function closeProductModal() { document.getElementById('product-modal').classLis
 async function handleProductFormSubmit(event) {
   event.preventDefault();
   const id = document.getElementById('pf-id').value;
+  const saleEl = document.getElementById('pf-sale-price');
   const payload = {
     name: document.getElementById('pf-name').value.trim(),
     sku: document.getElementById('pf-sku').value.trim(),
     price: Number(document.getElementById('pf-price').value),
-    sale_price: document.getElementById('pf-sale-price').value ? Number(document.getElementById('pf-sale-price').value) : null,
+    sale_price: (saleEl && saleEl.value) ? Number(saleEl.value) : null,
     category_id: document.getElementById('pf-category').value ? Number(document.getElementById('pf-category').value) : null,
     description: document.getElementById('pf-description').value.trim() || null,
   };
@@ -1678,21 +1693,51 @@ async function handleProductFormSubmit(event) {
 
 async function archiveProduct(id) {
   if (!confirm('Archive this product? It will be hidden from the public catalog.')) return;
-  try { await apiFetch('/products/' + id, { method: 'DELETE' }); showToast('Product archived.', 'info'); await loadCatalogData(); refreshAdminProducts(); }
-  catch (e) { showToast(e.message, 'error'); }
+  const prod = adminProductsCache.find(p => p.id === id);
+  if (prod) {
+    prod.status = 'archived';
+    renderAdminProductsTable();
+  }
+  try {
+    await apiFetch('/products/' + id, { method: 'DELETE' });
+    showToast('Product archived.', 'info');
+    loadCatalogData();
+  } catch (e) {
+    showToast(e.message, 'error');
+    refreshAdminProducts();
+  }
 }
 
 async function unarchiveProduct(id) {
   if (!confirm('Unarchive this product? It will become visible in the public catalog again.')) return;
-  try { await apiFetch('/products/' + id + '/unarchive', { method: 'PATCH' }); showToast('Product unarchived and now active.', 'success'); await loadCatalogData(); refreshAdminProducts(); }
-  catch (e) { showToast(e.message, 'error'); }
+  const prod = adminProductsCache.find(p => p.id === id);
+  if (prod) {
+    prod.status = 'active';
+    renderAdminProductsTable();
+  }
+  try {
+    await apiFetch('/products/' + id + '/unarchive', { method: 'PATCH' });
+    showToast('Product unarchived and now active.', 'success');
+    loadCatalogData();
+  } catch (e) {
+    showToast(e.message, 'error');
+    refreshAdminProducts();
+  }
 }
 
 async function deleteProductPermanently(id, name) {
   if (!confirm('PERMANENTLY DELETE "' + name + '"?\n\nThis cannot be undone. The product will be completely removed from the database.')) return;
   if (!confirm('Are you absolutely sure? This will permanently remove "' + name + '" from the system.')) return;
-  try { await apiFetch('/products/' + id + '/permanent', { method: 'DELETE' }); showToast('Product permanently deleted.', 'success'); await loadCatalogData(); refreshAdminProducts(); }
-  catch (e) { showToast(e.message, 'error'); }
+  adminProductsCache = adminProductsCache.filter(p => p.id !== id);
+  renderAdminProductsTable();
+  try {
+    await apiFetch('/products/' + id + '/permanent', { method: 'DELETE' });
+    showToast('Product permanently deleted.', 'success');
+    loadCatalogData();
+  } catch (e) {
+    showToast(e.message, 'error');
+    refreshAdminProducts();
+  }
 }
 
 // --- Admin: orders kanban
@@ -1725,51 +1770,78 @@ async function renderAdminKanban(container) {
   await refreshKanban();
 }
 
+let kanbanOrdersCache = [];
+
+function renderKanbanFromCache() {
+  const el = document.getElementById('kanban-board');
+  if (!el) return;
+  const groups = { PENDING: [], CONFIRMED: [], PREPARING: [], READY: [], DONE: [] };
+  kanbanOrdersCache.forEach(o => {
+    if (o.status === 'DELIVERED' || o.status === 'PICKED_UP') groups.DONE.push(o);
+    else if (groups[o.status]) groups[o.status].push(o);
+  });
+  el.innerHTML = '<div class="kanban-board">' + KANBAN_COLUMNS.map(col => {
+    const allOrders = groups[col.status] || [];
+    const orders2 = col.status === 'DONE' ? allOrders.slice(0, 50) : allOrders;
+    const cards = orders2.map(o => {
+      let nextBtn = '';
+      if (col.next) {
+        const label = col.next === 'CONFIRMED' ? 'Confirmed' : (col.next === 'PREPARING' ? 'Preparing' : 'Ready');
+        nextBtn = '<button class="btn-primary btn-sm" style="margin-top:8px; width:100%; justify-content:center;" onclick="advanceOrder(' + o.id + ", '" + col.next + "')\">Move to " + label + '</button>';
+      }
+      let readyBtn = '';
+      if (col.status === 'READY') {
+        const target = o.order_type === 'DELIVERY' ? 'OUT_FOR_DELIVERY' : 'PICKED_UP';
+        const label = o.order_type === 'DELIVERY' ? 'Send Out for Delivery' : 'Mark Picked Up';
+        readyBtn = '<button class="btn-primary btn-sm" style="margin-top:8px; width:100%; justify-content:center;" onclick="advanceOrder(' + o.id + ", '" + target + "')\">" + label + '</button>';
+      }
+      const cancelBtn = col.status !== 'DONE' ? '<button class="btn-danger-sm" style="margin-top:6px; width:100%;" onclick="advanceOrder(' + o.id + ", 'CANCELLED')\">Cancel</button>" : '';
+      return '<div class="order-card"><div style="font-weight:700; font-size:14px;">#' + o.order_number + '</div>' +
+        '<div style="font-size:12px; color:var(--text-muted);">' + escapeHtml(o.customer_name || 'Guest') + ' &middot; ' + o.order_type + '</div>' +
+        '<div style="margin-top:8px; font-weight:800; color:var(--primary);">' + money(o.total) + '</div>' + nextBtn + readyBtn + cancelBtn + '</div>';
+    }).join('') || '<p style="font-size:13px; color:var(--text-muted); padding:8px;">No orders</p>';
+    const content = col.status === 'DONE'
+      ? '<div class="kanban-scroll-list">' + cards + '</div>'
+      : cards;
+    return '<div class="kanban-col"><div class="kanban-header">' + col.label.toUpperCase() + ' (' + orders2.length + ')</div>' + content + '</div>';
+  }).join('') + '</div>';
+}
+
 async function refreshKanban() {
   const el = document.getElementById('kanban-board');
   try {
     const page = await apiFetch('/orders/admin/list?limit=100');
-    const orders = page.items;
-    const groups = { PENDING: [], CONFIRMED: [], PREPARING: [], READY: [], DONE: [] };
-    orders.forEach(o => {
-      if (o.status === 'DELIVERED' || o.status === 'PICKED_UP') groups.DONE.push(o);
-      else if (groups[o.status]) groups[o.status].push(o);
-    });
-    el.innerHTML = '<div class="kanban-board">' + KANBAN_COLUMNS.map(col => {
-      const orders2 = groups[col.status];
-      const cards = orders2.map(o => {
-        let nextBtn = '';
-        if (col.next) {
-          const label = col.next === 'CONFIRMED' ? 'Confirmed' : (col.next === 'PREPARING' ? 'Preparing' : 'Ready');
-          nextBtn = '<button class="btn-primary btn-sm" style="margin-top:8px; width:100%; justify-content:center;" onclick="advanceOrder(' + o.id + ", '" + col.next + "')\">Move to " + label + '</button>';
-        }
-        let readyBtn = '';
-        if (col.status === 'READY') {
-          const target = o.order_type === 'DELIVERY' ? 'OUT_FOR_DELIVERY' : 'PICKED_UP';
-          const label = o.order_type === 'DELIVERY' ? 'Send Out for Delivery' : 'Mark Picked Up';
-          readyBtn = '<button class="btn-primary btn-sm" style="margin-top:8px; width:100%; justify-content:center;" onclick="advanceOrder(' + o.id + ", '" + target + "')\">" + label + '</button>';
-        }
-        const cancelBtn = col.status !== 'DONE' ? '<button class="btn-danger-sm" style="margin-top:6px; width:100%;" onclick="advanceOrder(' + o.id + ", 'CANCELLED')\">Cancel</button>" : '';
-        return '<div class="order-card"><div style="font-weight:700; font-size:14px;">#' + o.order_number + '</div>' +
-          '<div style="font-size:12px; color:var(--text-muted);">' + escapeHtml(o.customer_name || 'Guest') + ' &middot; ' + o.order_type + '</div>' +
-          '<div style="margin-top:8px; font-weight:800; color:var(--primary);">' + money(o.total) + '</div>' + nextBtn + readyBtn + cancelBtn + '</div>';
-      }).join('') || '<p style="font-size:13px; color:var(--text-muted); padding:8px;">No orders</p>';
-      const content = col.status === 'DONE'
-        ? '<div class="kanban-scroll-list">' + cards + '</div>'
-        : cards;
-      return '<div class="kanban-col"><div class="kanban-header">' + col.label.toUpperCase() + ' (' + orders2.length + ')</div>' + content + '</div>';
-    }).join('') + '</div>';
+    kanbanOrdersCache = page.items || [];
+    renderKanbanFromCache();
   } catch (e) {
-    el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
+    if (el) el.innerHTML = '<p style="color:var(--danger);">' + e.message + '</p>';
   }
 }
 
 async function advanceOrder(orderId, newStatus) {
+  const prevOrder = kanbanOrdersCache.find(o => o.id === orderId);
+  const oldStatus = prevOrder ? prevOrder.status : null;
+  // Optimistically update status and re-render board instantly
+  if (prevOrder) {
+    prevOrder.status = (newStatus === 'OUT_FOR_DELIVERY') ? 'DELIVERED' : newStatus;
+    renderKanbanFromCache();
+  }
   try {
     await apiFetch('/orders/' + orderId + '/status', { method: 'PATCH', body: { status: newStatus } });
-    showToast('Order updated.', 'success');
-    refreshKanban();
-  } catch (e) { showToast(e.message, 'error'); }
+    showToast('Order status updated.', 'success');
+    // Silently sync latest state in background
+    apiFetch('/orders/admin/list?limit=100').then(page => {
+      kanbanOrdersCache = page.items || [];
+      renderKanbanFromCache();
+    }).catch(() => {});
+  } catch (e) {
+    // Rollback if request fails
+    if (prevOrder && oldStatus) {
+      prevOrder.status = oldStatus;
+      renderKanbanFromCache();
+    }
+    showToast(e.message, 'error');
+  }
 }
 
 // --- Admin: inventory
