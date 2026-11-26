@@ -24,7 +24,7 @@ def get_settings(db: Session = Depends(get_db)) -> dict[str, Any]:
 def update_settings(
     payload: SettingsBulkUpdate,
     db: Session = Depends(get_db),
-    actor: User = Depends(require_roles("admin", "owner")),
+    actor: User = Depends(require_roles("admin")),
 ) -> dict[str, Any]:
     items = [item.model_dump() for item in payload.settings]
     return setting_service.update_bulk_settings(db, items, actor=actor)

@@ -217,7 +217,14 @@ def checkout(db: Session, user: User, req) -> Order:
         coupon, discount = apply_coupon(db, req.coupon_code, user, subtotal)
     taxable = subtotal - discount
     tax = q2(taxable * _setting_number(db, "tax.rate_percent", "percent") / 100)
-    delivery_fee = q2(_setting_number(db, "delivery.fee_flat", "amount")) if req.order_type == OrderType.DELIVERY else Decimal("0.00")
+    if req.order_type == OrderType.DELIVERY:
+        free_above = _setting_number(db, "delivery.free_above", "amount")
+        if free_above > 0 and taxable >= free_above:
+            delivery_fee = Decimal("0.00")
+        else:
+            delivery_fee = q2(_setting_number(db, "delivery.fee_flat", "amount"))
+    else:
+        delivery_fee = Decimal("0.00")
     total = q2(taxable + tax + delivery_fee)
 
     # --- create the order
@@ -404,7 +411,14 @@ def guest_checkout(db: Session, req) -> Order:
         coupon, discount = apply_coupon(db, req.coupon_code, user, subtotal)
     taxable = subtotal - discount
     tax = q2(taxable * _setting_number(db, "tax.rate_percent", "percent") / 100)
-    delivery_fee = q2(_setting_number(db, "delivery.fee_flat", "amount")) if req.order_type == OrderType.DELIVERY else Decimal("0.00")
+    if req.order_type == OrderType.DELIVERY:
+        free_above = _setting_number(db, "delivery.free_above", "amount")
+        if free_above > 0 and taxable >= free_above:
+            delivery_fee = Decimal("0.00")
+        else:
+            delivery_fee = q2(_setting_number(db, "delivery.fee_flat", "amount"))
+    else:
+        delivery_fee = Decimal("0.00")
     total = q2(taxable + tax + delivery_fee)
 
     order = Order(

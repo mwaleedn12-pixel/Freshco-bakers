@@ -17,7 +17,7 @@ let state = {
   categories: [],
   isLoadingCatalog: true,
   authMode: 'login',
-  staffRoles: ['cashier', 'admin', 'owner'],
+  staffRoles: ['cashier', 'admin'],
   wishlistIds: [],
 };
 let posCart = [];
@@ -88,8 +88,8 @@ async function apiFetch(path, options = {}) {
 
 function isLoggedIn() { return !!state.currentUser; }
 function isStaff() { return isLoggedIn() && state.staffRoles.indexOf(state.currentUser.role) !== -1; }
-function isCashier() { return isLoggedIn() && ['cashier', 'admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
-function isAdminOrOwner() { return isLoggedIn() && ['admin', 'owner'].indexOf(state.currentUser.role) !== -1; }
+function isCashier() { return isLoggedIn() && ['cashier', 'admin'].indexOf(state.currentUser.role) !== -1; }
+function isAdminOrOwner() { return isLoggedIn() && ['admin'].indexOf(state.currentUser.role) !== -1; }
 
 function requireLogin(msg) {
   if (!isLoggedIn()) { showToast(msg || 'Please sign in first.', 'error'); openAuthModal(); return false; }
@@ -103,7 +103,7 @@ function renderAccessDenied(viewName) {
     '<h2 style="font-size:24px; font-weight:800; margin-bottom:12px; color:var(--text-main);">Access Restricted</h2>' +
     '<p style="color:var(--text-muted); font-size:14px; line-height:1.6; margin-bottom:24px;">' +
       (state.currentUser
-        ? ('You are signed in as a <strong style="color:var(--primary); text-transform:capitalize;">' + escapeHtml(roleName) + '</strong> (' + escapeHtml(state.currentUser.email) + '). ' + escapeHtml(viewName) + ' is reserved for authorized bakery staff (Cashier / Manager / Admin / Owner).')
+        ? ('You are signed in as a <strong style="color:var(--primary); text-transform:capitalize;">' + escapeHtml(roleName) + '</strong> (' + escapeHtml(state.currentUser.email) + '). ' + escapeHtml(viewName) + ' is reserved for authorized bakery staff (Cashier / Admin).')
         : ('Please sign in with authorized staff credentials to access ' + escapeHtml(viewName) + '.')) +
     '</p>' +
     '<div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">' +
@@ -139,7 +139,7 @@ window.addEventListener('hashchange', () => {
 function getHashTab() {
   const hash = (window.location.hash || '').replace('#', '').trim();
   const validCustomerTabs = ['home', 'catalog', 'cake', 'orders'];
-  const validAdminTabs = ['overview', 'products', 'orders-kanban', 'inventory', 'staff', 'settings'];
+  const validAdminTabs = ['overview', 'products', 'orders-kanban', 'staff', 'settings'];
   if (validCustomerTabs.indexOf(hash) !== -1) return { role: 'customer', tab: hash };
   if (validAdminTabs.indexOf(hash) !== -1) return { role: 'admin', tab: hash };
   if (hash === 'pos') return { role: 'pos', tab: 'pos' };
@@ -171,6 +171,7 @@ function setHashTab(role, tab) {
 }
 
 async function initApp() {
+  apiFetch('/settings', { auth: false }).then(s => { state.settings = s; }).catch(() => {});
   if (state.token) {
     try {
       state.currentUser = await apiFetch('/auth/me');
@@ -231,7 +232,9 @@ async function handleAuthSubmit(event) {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const btn = document.getElementById('auth-submit-btn');
+  const origBtnHtml = btn.innerHTML;
   btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (state.authMode === 'login' ? 'Signing In...' : 'Registering...');
   try {
     if (state.authMode === 'login') {
       const data = await apiFetch('/auth/login', { method: 'POST', auth: false, body: { email: email, password: password } });
@@ -267,6 +270,7 @@ async function handleAuthSubmit(event) {
     showToast(e.message, 'error');
   } finally {
     btn.disabled = false;
+    btn.innerHTML = origBtnHtml;
   }
 }
 
@@ -275,7 +279,9 @@ async function quickFillAuth(email, password, targetRole) {
   document.getElementById('auth-email').value = email;
   document.getElementById('auth-password').value = password;
   const btn = document.getElementById('auth-submit-btn');
+  const origBtnHtml = btn.innerHTML;
   btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (state.authMode === 'login' ? 'Signing In...' : 'Registering...');
   try {
     const data = await apiFetch('/auth/login', { method: 'POST', auth: false, body: { email: email, password: password } });
     applySession(data);
@@ -295,6 +301,7 @@ async function quickFillAuth(email, password, targetRole) {
     showToast(e.message, 'error');
   } finally {
     btn.disabled = false;
+    btn.innerHTML = origBtnHtml;
   }
 }
 
@@ -354,6 +361,14 @@ function updateUserUI() {
 
 // ------------------------------------------------------- role / tab router
 function switchRole(role) {
+  if (isAdminOrOwner() && role !== 'admin') {
+    showToast('Admin accounts only have access to the Admin Dashboard.', 'error');
+    return;
+  }
+  if (isLoggedIn() && state.currentUser.role === 'cashier' && role !== 'pos') {
+    showToast('Cashier accounts only have access to the POS Counter Billing.', 'error');
+    return;
+  }
   if (role !== 'customer') {
     if (!isLoggedIn()) {
       showToast('Staff sign-in required to open ' + (role === 'pos' ? 'POS Counter Billing' : 'Admin Dashboard') + '.', 'info');
@@ -365,6 +380,16 @@ function switchRole(role) {
       state.currentRole = 'customer';
       state.currentTab = 'home';
       renderApp();
+      return;
+    }
+  }
+  if (role === 'customer' && isLoggedIn() && isStaff()) {
+    if (isAdminOrOwner()) {
+      showToast('Admin accounts only have access to the Admin Dashboard.', 'error');
+      return;
+    }
+    if (state.currentUser.role === 'cashier') {
+      showToast('Cashier accounts only have access to the POS Counter Billing.', 'error');
       return;
     }
   }
@@ -402,11 +427,43 @@ function renderApp() {
   const container = document.getElementById('main-content');
   updateUserUI();
 
-  // Strict role security: non-staff cannot view admin or pos
-  if (state.currentRole !== 'customer' && !isStaff()) {
+  // Strict role security: non-staff cannot view admin or pos; admin only views admin; cashier only views pos
+  if (isAdminOrOwner()) {
+    if (state.currentRole !== 'admin') {
+      state.currentRole = 'admin';
+      if (['overview', 'products', 'orders-kanban', 'staff', 'settings'].indexOf(state.currentTab) === -1) {
+        state.currentTab = 'overview';
+      }
+    }
+  } else if (isLoggedIn() && state.currentUser.role === 'cashier') {
+    state.currentRole = 'pos';
+    state.currentTab = 'pos';
+  } else if (state.currentRole !== 'customer' && !isStaff()) {
     state.currentRole = 'customer';
     state.currentTab = 'home';
   }
+
+  // Hide Customer Website and POS buttons for admin users; hide Customer Website and Admin for cashier
+  const btnCustomerRole = document.getElementById('btn-role-customer');
+  const btnPosRole = document.getElementById('btn-role-pos');
+  const btnAdminRole = document.getElementById('btn-role-admin');
+  if (isAdminOrOwner()) {
+    if (btnCustomerRole) btnCustomerRole.style.display = 'none';
+    if (btnPosRole) btnPosRole.style.display = 'none';
+    if (btnAdminRole) btnAdminRole.style.display = '';
+  } else if (isLoggedIn() && state.currentUser.role === 'cashier') {
+    if (btnCustomerRole) btnCustomerRole.style.display = 'none';
+    if (btnAdminRole) btnAdminRole.style.display = 'none';
+    if (btnPosRole) btnPosRole.style.display = '';
+  } else {
+    if (btnCustomerRole) btnCustomerRole.style.display = '';
+    if (btnPosRole) btnPosRole.style.display = '';
+    if (btnAdminRole) btnAdminRole.style.display = '';
+  }
+
+  // Show full footer only on Customer Website; hide entirely on admin/pos
+  const appFooter = document.getElementById('app-footer');
+  if (appFooter) appFooter.style.display = state.currentRole === 'customer' ? '' : 'none';
 
   // Update presentation buttons active state
   document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
@@ -442,7 +499,6 @@ function renderApp() {
     if (state.currentTab === 'overview') renderAdminDashboard(container);
     else if (state.currentTab === 'products') renderAdminProducts(container);
     else if (state.currentTab === 'orders-kanban') renderAdminKanban(container);
-    else if (state.currentTab === 'inventory') renderAdminInventory(container);
     else if (state.currentTab === 'staff') renderAdminStaff(container);
     else if (state.currentTab === 'settings') renderAdminSettings(container);
   } else if (state.currentRole === 'pos') {
@@ -831,7 +887,11 @@ function renderCartModal() {
   const body = document.getElementById('cart-modal-body');
   const subtotal = state.cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const discountAmount = Math.round(subtotal * appliedCouponDiscount);
-  const deliveryFee = (subtotal > 1500 || subtotal === 0) ? 0 : 150;
+  const deliveryFeeFlat = (state.settings && state.settings['delivery.fee_flat'] && state.settings['delivery.fee_flat'].value != null)
+    ? (typeof state.settings['delivery.fee_flat'].value === 'object' ? Number(state.settings['delivery.fee_flat'].value.amount) : Number(state.settings['delivery.fee_flat'].value)) : 150;
+  const freeAbove = (state.settings && state.settings['delivery.free_above'] && state.settings['delivery.free_above'].value != null)
+    ? (typeof state.settings['delivery.free_above'].value === 'object' ? Number(state.settings['delivery.free_above'].value.amount) : Number(state.settings['delivery.free_above'].value)) : 1500;
+  const deliveryFee = (subtotal === 0 || (freeAbove > 0 && subtotal >= freeAbove)) ? 0 : deliveryFeeFlat;
   const total = Math.max(0, subtotal - discountAmount + deliveryFee);
 
   if (!state.cart.length) {
@@ -857,7 +917,7 @@ function renderCartModal() {
   const defaultAddress = isReg ? (localStorage.getItem('freshco_saved_address') || '') : '';
 
   body.innerHTML = '' +
-    '<div class="cart-two-col" style="display:grid; grid-template-columns:1.05fr 0.95fr; gap:20px; align-items:start;">' +
+    '<div class="cart-two-col" style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">' +
 
       '<!-- LEFT MENU: Customer Input Data -->' +
       '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px;">' +
@@ -872,7 +932,7 @@ function renderCartModal() {
           '<input type="tel" id="checkout-phone" class="form-control" placeholder="03xxxxxxxxx" maxlength="11" value="' + escapeHtml(defaultPhone) + '" required></div>' +
 
         '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Order Type</label>' +
-          '<select id="checkout-order-type" class="form-select">' +
+          '<select id="checkout-order-type" class="form-select" onchange="updateCartPaymentMethods()">' +
             '<option value="DELIVERY">Home Delivery</option>' +
             '<option value="PICKUP">Pickup from Counter</option>' +
           '</select></div>' +
@@ -883,24 +943,24 @@ function renderCartModal() {
         '<div class="form-group" id="checkout-address-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Delivery Address</label>' +
           '<input type="text" id="checkout-address" class="form-control" placeholder="House #, Street, Block, Area, City" value="' + escapeHtml(defaultAddress) + '"></div>' +
 
-        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Payment Method</label>' +
-          '<select id="checkout-payment-method" class="form-select">' +
-            '<option value="COD">Cash on Delivery (COD)</option>' +
-            '<option value="CARD">Debit / Credit Card (POS on Delivery)</option>' +
-            '<option value="ONLINE">JazzCash / EasyPaisa Online Transfer</option>' +
-          '</select></div>' +
-
         '<div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:12px;">Special Instructions</label>' +
           '<input type="text" id="checkout-notes" class="form-control" value=""></div>' +
       '</div>' +
 
-      '<!-- RIGHT MENU: Products in cart, Promo code, Amount calculation, Place Order button -->' +
-      '<div>' +
-        '<div style="max-height:220px; overflow-y:auto; margin-bottom:12px; padding-right:4px;">' + rows + '</div>' +
+      '<!-- RIGHT MENU: Products in cart, Payment Method, Promo code, Amount calculation, Place Order button -->' +
+      '<div style="background:var(--card-bg, #fff); border:1px solid var(--border); border-radius:12px; padding:16px;">' +
+        '<div style="margin-bottom:12px; padding-right:4px;">' + rows + '</div>' +
+
+        '<!-- Payment Method -->' +
+        '<div class="form-group" style="margin-bottom:10px;"><label class="form-label" style="font-size:12px;">Payment Method</label>' +
+          '<select id="checkout-payment-method" class="form-select">' +
+            '<option value="COD">Cash on Delivery (COD)</option>' +
+            '<option value="ONLINE">EasyPaisa/JazzCash</option>' +
+          '</select></div>' +
 
         '<!-- Promo Code Box -->' +
         '<div style="margin:10px 0; display:flex; gap:8px;">' +
-          '<input type="text" id="coupon-input" class="form-control" placeholder="Promo Code (e.g. WELCOME10)" value="' + escapeHtml(appliedCouponCode) + '" style="text-transform:uppercase; font-size:13px;">' +
+          '<input type="text" id="coupon-input" class="form-control" value="' + escapeHtml(appliedCouponCode) + '" style="text-transform:uppercase; font-size:13px;">' +
           '<button type="button" class="btn-secondary" onclick="applyPromoCode()" style="padding:8px 16px; font-weight:700;">Apply</button>' +
         '</div>' +
 
@@ -908,7 +968,7 @@ function renderCartModal() {
         '<div style="background:var(--bg-light); padding:12px; border-radius:10px; border:1px solid var(--border); margin-bottom:16px; font-size:13px;">' +
           '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Subtotal:</span><strong>' + money(subtotal) + '</strong></div>' +
           (discountAmount > 0 ? '<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--success);"><span>Discount (' + (appliedCouponDiscount * 100) + '%):</span><strong>-' + money(discountAmount) + '</strong></div>' : '') +
-          '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Delivery Fee:</span><span>' + (deliveryFee === 0 ? '<span style="color:var(--success); font-weight:700;">FREE (Orders > Rs 1,500)</span>' : money(deliveryFee)) + '</span></div>' +
+          '<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Delivery Fee:</span><span>' + (deliveryFee === 0 ? '<span style="color:var(--success); font-weight:700;">FREE' + (freeAbove > 0 ? ' (Orders &ge; Rs ' + freeAbove.toLocaleString() + ')' : '') + '</span>' : money(deliveryFee)) + '</span></div>' +
           '<div style="display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:6px; font-size:16px; font-weight:800; color:var(--primary);"><span>Total Amount:</span><span>' + money(total) + '</span></div>' +
         '</div>' +
 
@@ -917,11 +977,30 @@ function renderCartModal() {
 
     '</div>';
 
+  // Set up order-type change handler (address/branch toggle + payment methods)
   document.getElementById('checkout-order-type').onchange = function (e) {
     const isDelivery = e.target.value === 'DELIVERY';
     document.getElementById('checkout-address-group').style.display = isDelivery ? 'block' : 'none';
     document.getElementById('checkout-branch-group').style.display = isDelivery ? 'none' : 'block';
+    updateCartPaymentMethods();
   };
+}
+
+function updateCartPaymentMethods() {
+  const orderTypeEl = document.getElementById('checkout-order-type');
+  const payEl = document.getElementById('checkout-payment-method');
+  if (!orderTypeEl || !payEl) return;
+  const type = orderTypeEl.value;
+  if (type === 'DELIVERY') {
+    payEl.innerHTML =
+      '<option value="COD">Cash on Delivery (COD)</option>' +
+      '<option value="ONLINE">EasyPaisa/JazzCash</option>';
+  } else {
+    payEl.innerHTML =
+      '<option value="CASH">Cash</option>' +
+      '<option value="CARD">Credit/Debit Card (POS)</option>' +
+      '<option value="ONLINE">EasyPaisa/JazzCash</option>';
+  }
 }
 
 async function handleCheckout() {
@@ -1113,12 +1192,11 @@ function selectTierQuick(tierText) {
 function renderCustomCakeTab(container) {
   container.innerHTML = '' +
     '<div style="text-align:center; max-width:700px; margin:0 auto 30px;">' +
-      '<span class="status-badge status-PREPARING" style="margin-bottom:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Master Pastry Studio</span>' +
       '<h2 style="font-size:30px; margin-bottom:8px; color:var(--text-main);">Custom Celebration Cake Architect</h2>' +
       '<p style="color:var(--text-muted); font-size:15px; line-height:1.5;">Design your personalized cake for weddings, birthdays &amp; corporate events. Get an instant estimate and quotation from our head chef.</p>' +
     '</div>' +
 
-    '<div style="display:grid; grid-template-columns:1.4fr 1fr; gap:28px; max-width:1100px; margin:0 auto 36px;">' +
+    '<div style="max-width:740px; margin:0 auto 36px;">' +
       '<!-- Cake Form Card -->' +
       '<div class="section-card">' +
         '<form onsubmit="handleCustomCakeSubmit(event)">' +
@@ -1158,25 +1236,6 @@ function renderCustomCakeTab(container) {
 
           '<button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px; font-size:16px; font-weight:700;"><i class="fa-solid fa-paper-plane"></i> Submit Request for Chef Quote</button>' +
         '</form>' +
-      '</div>' +
-
-      '<!-- Estimation & Inspiration Sidebar -->' +
-      '<div>' +
-        '<div class="section-card" style="background:linear-gradient(135deg, #FAF5EF, #FFF); border-color:var(--accent); position:sticky; top:100px;">' +
-          '<h3 style="font-size:18px; margin-bottom:12px; color:var(--text-main);"><i class="fa-solid fa-calculator" style="color:var(--accent);"></i> Estimated Price Preview</h3>' +
-          '<div style="font-size:32px; font-weight:800; color:var(--primary); margin-bottom:8px;" id="cake-estimate-badge">₨ 2,800</div>' +
-          '<p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">*Final quotation confirmed by pastry chef within 20 minutes based on intricate handcrafting complexity.</p>' +
-          
-          '<div style="border-top:1px solid var(--border); padding-top:16px; margin-top:16px;">' +
-            '<div style="font-weight:700; font-size:14px; margin-bottom:10px;">Why Order From Freshco Studio?</div>' +
-            '<div style="font-size:13px; color:var(--text-muted); line-height:1.6;">' +
-              '<div><i class="fa-solid fa-check" style="color:var(--success); margin-right:6px;"></i> Edible gold leaf &amp; organic florals</div>' +
-              '<div><i class="fa-solid fa-check" style="color:var(--success); margin-right:6px;"></i> Free mock digital sketch preview</div>' +
-              '<div><i class="fa-solid fa-check" style="color:var(--success); margin-right:6px;"></i> Temperature-controlled cake handling van</div>' +
-              '<div><i class="fa-solid fa-check" style="color:var(--success); margin-right:6px;"></i> Complimentary premium cake knife set</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
       '</div>' +
     '</div>' +
 
@@ -2010,16 +2069,36 @@ async function renderAdminSettings(container) {
     container.innerHTML = renderAccessDenied('Store Settings');
     return;
   }
-  container.innerHTML = '<div style="margin-bottom:24px;"><h2>Bakery Store Settings</h2><p style="color:var(--text-muted);">Delivery fee and tax rate used at checkout</p></div>' +
-    '<div class="section-card" id="settings-form-wrap"><p style="color:var(--text-muted);">Loading...</p></div>';
+  container.innerHTML = '<div style="margin-bottom:24px;"><h2>Bakery Store Settings</h2><p style="color:var(--text-muted);">Configure delivery charges, free delivery threshold, and admin account security</p></div>' +
+    '<div class="section-card" id="settings-form-wrap" style="margin-bottom:24px;"><p style="color:var(--text-muted);">Loading...</p></div>' +
+    '<div class="section-card" id="admin-password-wrap">' +
+      '<h3 style="margin-bottom:14px; font-size:18px;">Admin Account Password</h3>' +
+      '<form onsubmit="event.preventDefault(); showToast(\'Password update will be enabled soon.\', \'info\');">' +
+        '<div class="form-group"><label class="form-label">Current Password</label><input id="admin-current-pw" type="password" class="form-control"></div>' +
+        '<div class="form-group"><label class="form-label">New Password</label><input id="admin-new-pw" type="password" class="form-control"></div>' +
+        '<div class="form-group"><label class="form-label">Confirm New Password</label><input id="admin-confirm-pw" type="password" class="form-control"></div>' +
+        '<div style="display:flex; gap:12px; flex-wrap:wrap;">' +
+          '<button class="btn-primary" type="submit">Change Password</button>' +
+          '<button class="btn-secondary" type="button" onclick="return false;">Reset Password</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
   try {
     const settings = await apiFetch('/settings');
-    const deliveryFee = (settings['delivery.fee_flat'] && settings['delivery.fee_flat'].amount) || 0;
-    const taxPercent = (settings['tax.rate_percent'] && settings['tax.rate_percent'].percent) || 0;
+    state.settings = settings;
+    function _settingNum(s, key, def) {
+      var v = s[key] && s[key].value;
+      if (v == null) return def;
+      if (typeof v === 'object' && v.amount != null) return Number(v.amount);
+      return Number(v);
+    }
+    const deliveryFee = _settingNum(settings, 'delivery.fee_flat', 150);
+    const freeAbove = _settingNum(settings, 'delivery.free_above', 1500);
     document.getElementById('settings-form-wrap').innerHTML = '' +
+      '<h3 style="margin-bottom:14px; font-size:18px;">Delivery Fee Configuration</h3>' +
       '<form onsubmit="handleSaveSettings(event)">' +
-        '<div class="form-group"><label class="form-label">Flat Delivery Fee (Rs)</label><input id="set-delivery-fee" type="number" step="0.01" class="form-control" value="' + deliveryFee + '"></div>' +
-        '<div class="form-group"><label class="form-label">Tax Rate (%)</label><input id="set-tax-percent" type="number" step="0.01" class="form-control" value="' + taxPercent + '"></div>' +
+        '<div class="form-group"><label class="form-label">Delivery Fee (Rs)</label><input id="set-delivery-fee" type="number" step="0.01" min="0" class="form-control" value="' + deliveryFee + '"></div>' +
+        '<div class="form-group"><label class="form-label">Free Delivery Order Amount (Rs)</label><input id="set-free-above" type="number" step="0.01" min="0" class="form-control" value="' + freeAbove + '"><small style="color:var(--text-muted); display:block; margin-top:4px;">Orders equal to or above this amount get 0% delivery fee.</small></div>' +
         '<button class="btn-primary" type="submit">Save Settings</button>' +
       '</form>';
   } catch (e) {
@@ -2029,13 +2108,19 @@ async function renderAdminSettings(container) {
 
 async function handleSaveSettings(event) {
   event.preventDefault();
+  const feeVal = Number(document.getElementById('set-delivery-fee').value);
+  const freeAboveVal = Number(document.getElementById('set-free-above').value);
   const payload = {
     settings: [
-      { key: 'delivery.fee_flat', value: { amount: Number(document.getElementById('set-delivery-fee').value) }, category: 'delivery' },
-      { key: 'tax.rate_percent', value: { percent: Number(document.getElementById('set-tax-percent').value) }, category: 'tax' },
+      { key: 'delivery.fee_flat', value: { amount: feeVal }, category: 'delivery' },
+      { key: 'delivery.free_above', value: { amount: freeAboveVal }, category: 'delivery' },
     ],
   };
-  try { await apiFetch('/settings', { method: 'PUT', body: payload }); showToast('Settings saved.', 'success'); }
+  try {
+    const updated = await apiFetch('/settings', { method: 'PUT', body: payload });
+    state.settings = updated;
+    showToast('Settings saved.', 'success');
+  }
   catch (e) { showToast(e.message, 'error'); }
 }
 

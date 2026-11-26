@@ -82,6 +82,24 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_PREFIX}/redoc",
 )
 
+
+@app.on_event("startup")
+def _warmup_db_pool() -> None:
+    """Pre-warm the Neon PostgreSQL connection pool in a background thread."""
+    import threading
+    from sqlalchemy import text
+    from app.db.session import SessionLocal
+
+    def _ping() -> None:
+        try:
+            db = SessionLocal()
+            db.execute(text("SELECT 1"))
+            db.close()
+        except Exception as exc:
+            logger.debug("DB warmup ping skipped: %s", exc)
+
+    threading.Thread(target=_ping, daemon=True, name="db-warmup").start()
+
 # ---------------------------------------------------------------- middleware
 # Order matters — outermost middleware runs first:
 #   1. Request-ID     (assigns trace id before anything else)
